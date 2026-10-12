@@ -31,3 +31,11 @@
 - Security review fixed resume-without-code room allocation and added a regression test. A fake-clock host-election test fixture was corrected to distinguish arrival timestamps; engine tie-breaking remains deterministic by ID.
 - README, requirements map, performance methodology/conditions/limitations, demo walkthrough and viva notes reflect final implementation. Actual physical LAN and non-Chromium performance remain unverified; repeat instructions included.
 - Documented development startup (`npm run dev`) left running at **http://localhost:5173** with API/backend on port 3001. Health endpoint returns OK; catalog endpoint returns 26 entries.
+
+## YouTube and listening follow-up — 12 October 2026
+
+- Discovery moved to the right sidebar; Add a link moved directly under the player. Provider status no longer shrinks the iframe beside it.
+- Fixed repeated play/seek during provider buffering and seek-state feedback. YouTube play waits for actual playing/autoplay events, host iframe actions go through room permission checks, and retry recreates the player.
+- Listen accepts individual YouTube/YouTube Music songs with the full visible video; music search opens the provider website, then users paste and queue share links. No scraping or audio extraction.
+- Build/type checks, 35 unit/protocol tests, four browser workflows, real YouTube smoke playback and refreshed ten-user socket/browser benchmarks passed. Latest browser delivery p95 10.53 ms, application p95 122.44 ms, corrected drift maximum 74.53 ms. Socket delivery p95 6.95 ms. These are localhost results; YouTube smoke playback is separate.
+- Production demo is running at http://localhost:3001. Build retries encountered Windows allocation limits; checks were serialized, source maps made opt-in, and the successful build used a 512 MiB Node heap with one Rayon thread.

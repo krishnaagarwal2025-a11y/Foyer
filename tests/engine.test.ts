@@ -280,7 +280,7 @@ describe("shared activity and bonuses", () => {
     expect(r.playing).toBe(true);
     expect(r.mediaRevision).toBe(1);
   });
-  it("keeps Listen rooms audio-only, including items queued before a mode switch", () => {
+  it("keeps Listen rooms on audio or visible YouTube songs, removing other video items", () => {
     run("a", { type: "enqueue", movieId: "local-demo" });
     run("a", { type: "enqueue", movieId: "demo-audio" });
     run("a", { type: "mode", mode: "listen" });
@@ -300,6 +300,24 @@ describe("shared activity and bonuses", () => {
         },
       }).error,
     ).toMatch(/audio/i);
+  });
+  it("loads and queues YouTube Music links in Listen rooms with normal role checks", () => {
+    run("a", { type: "mode", mode: "listen" });
+    const source = {
+      type: "source",
+      media: {
+        title: "Song",
+        url: "https://music.youtube.com/watch?v=abcdefghijk",
+        duration: 255,
+      },
+    };
+    expect(run("b", source).ok).toBe(false);
+    expect(run("b", { ...source, enqueue: true }).ok).toBe(true);
+    expect(run("a", source).ok).toBe(true);
+    const room = engine.rooms.get(code)!;
+    expect(room.media.provider).toBe("youtube");
+    expect(room.media.kind).toBe("video");
+    expect(room.queue[0].movie.sourceId).toBe("abcdefghijk");
   });
   it("distinguishes metadata and validates custom direct source URLs", () => {
     expect(run("a", { type: "media", movieId: "sample-1" }).ok).toBe(false);

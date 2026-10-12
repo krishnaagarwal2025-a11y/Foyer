@@ -13,6 +13,7 @@ export interface PlaybackHandle {
   readonly readyState: number;
   readonly seekable: { length: number };
   readonly seeking: boolean;
+  readonly buffering?: boolean;
   muted: boolean;
   playbackRate: number;
   readonly supportsRate?: boolean;
@@ -30,6 +31,10 @@ type Props = {
   onEnded: () => void;
   onError: (message: string) => void;
   onWaiting: () => void;
+  onProviderControl: (
+    type: "play" | "pause" | "seek",
+    position?: number,
+  ) => boolean;
 };
 const scripts = new Map<string, Promise<void>>();
 function loadScript(url: string) {
@@ -236,6 +241,7 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
           paused = true,
           loaded = false,
           seeking = false,
+          buffering = false,
           isMuted = props.muted;
         let play = async () => {},
           pause = () => {},
@@ -265,6 +271,9 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
           },
           get seeking() {
             return seeking;
+          },
+          get buffering() {
+            return buffering;
           },
           get muted() {
             return isMuted;
@@ -327,7 +336,27 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
             if (disposed) return;
             const mount = document.createElement("div");
             container.current!.replaceChildren(mount);
+            let pendingPlay: Promise<void> | undefined;
+            let finishPlay: (() => void) | undefined;
+            let failPlay: ((error: Error) => void) | undefined;
+            let playTimeout: ReturnType<typeof setTimeout> | undefined;
+            let intendedState: number | undefined;
+            let commandUntil = 0;
+            let seekTarget: number | undefined;
+            let seekDeadline = 0;
+            const settlePlay = (failure?: Error) => {
+              clearTimeout(playTimeout);
+              const resolve = finishPlay,
+                reject = failPlay;
+              pendingPlay = undefined;
+              finishPlay = undefined;
+              failPlay = undefined;
+              if (failure) reject?.(failure);
+              else resolve?.();
+            };
             const player = new window.YT!.Player(mount, {
+              width: "100%",
+              height: "100%",
               videoId: m.sourceId,
               playerVars: { playsinline: 1, origin: location.origin, rel: 0 },
               events: {
@@ -336,36 +365,116 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
                   onReady();
                 },
                 onStateChange: (e: { data: number }) => {
-                  paused = e.data !== 1;
+                  if (disposed) return;
+                  buffering = e.data === 3;
+                  if (e.data === 1) {
+                    paused = false;
+                    settlePlay();
+                  } else if ([0, 2, 5, -1].includes(e.data)) paused = true;
+                  const commanded =
+                    seeking ||
+                    e.data === intendedState ||
+                    (intendedState !== undefined &&
+                      performance.now() < commandUntil);
+                  if (e.data === intendedState) intendedState = undefined;
                   query();
-                  if (e.data === 1) callbacks.current.onPlaying();
+                  const userAction =
+                    loaded &&
+                    [1, 2].includes(e.data) &&
+                    !commanded &&
+                    callbacks.current.onProviderControl(
+                      e.data === 1 ? "play" : "pause",
+                    );
+                  if (e.data === 1 && !userAction)
+                    callbacks.current.onPlaying();
+                  if ([2, 5].includes(e.data) && loaded && !userAction)
+                    callbacks.current.onReady();
                   if (e.data === 0) callbacks.current.onEnded();
                   if (e.data === 3) callbacks.current.onWaiting();
                 },
-                onError: (e: { data: number }) =>
-                  error(
-                    `YouTube cannot play this video (code ${e.data}). It may be private, restricted, or have embedding disabled.`,
-                  ),
-                onAutoplayBlocked: () =>
-                  error("Autoplay was blocked. Click to sync and play."),
+                onError: (e: { data: number }) => {
+                  buffering = false;
+                  const message =
+                    e.data === 153
+                      ? "YouTube needs a browser referrer to play this video. Open Foyer in Chrome or Edge and retry."
+                      : `YouTube cannot play this video (code ${e.data}). It may be private, restricted, or have embedding disabled. Try another link or open it on YouTube.`;
+                  settlePlay(Error(message));
+                  error(message);
+                },
+                onAutoplayBlocked: () => {
+                  buffering = false;
+                  const message =
+                    "Autoplay was blocked. Click to sync and play.";
+                  settlePlay(Error(message));
+                  error(message);
+                },
               },
             });
-            play = async () => {
+            play = () => {
+              if (player.getPlayerState() === 1) return Promise.resolve();
+              if (pendingPlay) return pendingPlay;
+              intendedState = 1;
+              commandUntil = performance.now() + 1500;
+              pendingPlay = new Promise<void>((resolve, reject) => {
+                finishPlay = resolve;
+                failPlay = reject;
+              });
+              playTimeout = setTimeout(() => {
+                buffering = false;
+                settlePlay(
+                  Error(
+                    "Playback did not start. Click to sync and play, or check the video's availability.",
+                  ),
+                );
+              }, 8000);
+              const request = pendingPlay;
               player.playVideo();
+              return request;
             };
-            pause = () => player.pauseVideo();
+            pause = () => {
+              if (player.getPlayerState() === 2 || intendedState === 2) return;
+              intendedState = 2;
+              commandUntil = performance.now() + 1500;
+              settlePlay();
+              player.pauseVideo();
+            };
             seek = (t) => {
+              seekTarget = t;
+              seekDeadline = performance.now() + 3000;
+              commandUntil = performance.now() + 1500;
               player.seekTo(t, true);
-              position = t;
-              setTimeout(completeSeek, 250);
             };
             volume = (v) => (v ? player.mute() : player.unMute());
             query = () => {
+              const previous = position;
               position = player.getCurrentTime() || 0;
               duration = player.getDuration() || duration;
-              paused = player.getPlayerState() !== 1;
+              const state = player.getPlayerState();
+              buffering = state === 3;
+              if (state === 1) paused = false;
+              else if ([0, 2, 5, -1].includes(state)) paused = true;
+              if (
+                seekTarget !== undefined &&
+                !buffering &&
+                (Math.abs(position - seekTarget) < 0.5 ||
+                  performance.now() > seekDeadline)
+              ) {
+                seekTarget = undefined;
+                completeSeek();
+              } else if (
+                !seeking &&
+                loaded &&
+                !buffering &&
+                performance.now() > commandUntil &&
+                Math.abs(position - previous) > 1.5
+              ) {
+                callbacks.current.onProviderControl("seek", position);
+              }
             };
-            destroy = () => player.destroy();
+            destroy = () => {
+              settlePlay();
+              player.destroy();
+            };
           } else if (p === "vimeo") {
             const { default: VimeoPlayer } = await import("@vimeo/player");
             if (disposed) return;

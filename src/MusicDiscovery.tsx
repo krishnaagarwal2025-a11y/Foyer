@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import type { Movie } from "../shared/types";
+import { normalizeSource } from "../shared/media";
 export function MusicDiscovery({
   command,
   canControl,
@@ -9,7 +10,7 @@ export function MusicDiscovery({
   canControl: boolean;
   connected: boolean;
 }) {
-  const [provider, setProvider] = useState("audius"),
+  const [provider, setProvider] = useState("youtube"),
     [query, setQuery] = useState(""),
     [tracks, setTracks] = useState<Movie[]>([]),
     [error, setError] = useState(""),
@@ -53,19 +54,31 @@ export function MusicDiscovery({
           <div className="eyebrow">A SOUNDTRACK FOR YOUR PEOPLE</div>
           <h2>Find your next listen.</h2>
         </div>
-        <span className="pill">OPEN MUSIC + YOUR LIBRARY</span>
+        <span className="pill">YOUTUBE + MUSIC LIBRARIES</span>
       </div>
       <form
         className="search-row"
         onSubmit={(e) => {
           e.preventDefault();
+          if (provider === "youtube") {
+            window.open(
+              `https://music.youtube.com/search?q=${encodeURIComponent(query)}`,
+              "_blank",
+              "noopener,noreferrer",
+            );
+            return;
+          }
           void search();
         }}
       >
         <input
           aria-label="Search songs"
           maxLength={100}
-          placeholder="Search songs or artists; leave blank for trending…"
+          placeholder={
+            provider === "youtube"
+              ? "Find a song or artist on YouTube Music…"
+              : "Search songs or artists; leave blank for trending…"
+          }
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -78,15 +91,85 @@ export function MusicDiscovery({
             setError("");
           }}
         >
+          <option value="youtube">YouTube Music</option>
           <option value="audius">Audius</option>
           <option value="navidrome" disabled={!nav}>
             Navidrome {nav ? "" : "(not configured)"}
           </option>
         </select>
         <button className="primary" disabled={loading}>
-          {loading ? "Searching…" : "Find music"}
+          {provider === "youtube"
+            ? "Search YouTube Music ↗"
+            : loading
+              ? "Searching…"
+              : "Find music"}
         </button>
       </form>
+      {provider === "youtube" && (
+        <form
+          className="youtube-music-links"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const form = new FormData(
+              event.currentTarget,
+              (event.nativeEvent as SubmitEvent).submitter,
+            );
+            try {
+              if (
+                normalizeSource(String(form.get("url"))).provider !== "youtube"
+              )
+                throw Error(
+                  "Paste an individual YouTube or YouTube Music song link.",
+                );
+            } catch (failure) {
+              setError(
+                failure instanceof Error
+                  ? failure.message
+                  : "Invalid song link.",
+              );
+              return;
+            }
+            setError("");
+            command({
+              type: "source",
+              enqueue: form.get("action") === "queue",
+              media: {
+                url: String(form.get("url")),
+                title: String(form.get("title") || "YouTube Music song"),
+                duration: 3600,
+              },
+            });
+          }}
+        >
+          <p className="muted">
+            Search opens YouTube Music. Copy an individual song's share link
+            here to listen together. The official video stays visible; some
+            songs disallow embedding or require access on YouTube.
+          </p>
+          <input
+            name="title"
+            aria-label="YouTube Music song title"
+            placeholder="Song title (optional)"
+            maxLength={100}
+          />
+          <input
+            name="url"
+            aria-label="YouTube Music song URL"
+            placeholder="https://music.youtube.com/watch?v=…"
+            type="url"
+            required
+            maxLength={2000}
+          />
+          <div className="card-actions">
+            <button name="action" value="play" disabled={!canControl}>
+              Play song
+            </button>
+            <button name="action" value="queue" disabled={!connected}>
+              Queue song
+            </button>
+          </div>
+        </form>
+      )}
       {provider === "navidrome" && (
         <label>
           Private library access code
@@ -101,8 +184,8 @@ export function MusicDiscovery({
       )}
       <p className="muted">
         Audius contains artist-published music, not every commercial song.
-        SoundCloud links and direct audio can also be added below. Navidrome
-        connects your own collection.
+        YouTube Music, SoundCloud links and direct audio can also be added to
+        the room. Navidrome connects your own collection.
       </p>
       {error && (
         <p role="alert" className="error">
@@ -159,7 +242,7 @@ export function MusicDiscovery({
           </article>
         ))}
       </div>
-      {!loading && !tracks.length && !error && (
+      {provider !== "youtube" && !loading && !tracks.length && !error && (
         <p className="empty">
           Search the open catalog, or start with the local melody.
         </p>

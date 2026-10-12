@@ -47,7 +47,7 @@ The extension reads the service page's title URL and document title and controls
 
 ## Listen to music
 
-Create a **Listen** room or have the host switch an existing room to Listen. The room loads its local demo song. Search and queue free, artist-published tracks through Audius when its public API is available. SoundCloud links and direct audio files also use the synchronized shared player.
+Create a **Listen** room or have the host switch an existing room to Listen. The room loads its local demo song. Choose **YouTube Music** to search its website in a new tab, then paste an individual song share link into **YouTube Music song URL** and use **Play song** or **Queue song**. YouTube and YouTube Music links use the full visible official YouTube player; video is retained, and embedding restrictions still apply. Album/playlist-only links need an individual song selected first. Search results are on YouTube Music, rather than a scraped or extracted catalog in Foyer. Search and queue free, artist-published tracks through Audius when its public API is available. SoundCloud links and direct audio files also use the synchronized shared player.
 
 There is no open GitHub repository that can lawfully supply the complete commercial song catalogs from major platforms. Foyer therefore uses [Audius's public catalog](https://docs.audius.co/developers/introduction/overview/) for no-key music discovery and integrates [Navidrome](https://github.com/navidrome/navidrome) for a **private, self-hosted collection you supply**. Navidrome is open-source server software, not a download of all songs. Configure its server settings in `.env`; Foyer never stores the password in the browser. A separate library access code protects searches, and signed, short-lived tickets authorize audio streaming through Foyer.
 
@@ -76,6 +76,7 @@ npm test
 npm run build
 npm run test:browser
 npm run test:extension
+npm run providers:youtube
 npm run benchmark
 npm run benchmark:browser
 ```
@@ -88,7 +89,7 @@ See [PERFORMANCE.md](PERFORMANCE.md) for actual results, timing definitions, mac
 
 The Node/Socket.IO server owns room timelines. A playback state consists of a position and server-time anchor: while playing, every client calculates `anchor position + elapsed server time`. Clients estimate offset from repeated monotonic ping samples. State snapshots have strictly increasing versions and media revisions; stale commands are rejected, successful operation IDs are deduplicated, and the server broadcasts a full snapshot to new/reconnecting members. SQLite WAL checkpoints the catalog and room metadata, bounded chat, queue, polls, bookmarks, preferences and reconnect tokens. The active clock remains in memory and rooms restore paused after a server restart.
 
-For native media, 100-ms drift checks seek after 500 ms, use bounded ±5% rate correction for moderate drift, and reset to normal when stable. Provider players with discrete or unreliable rate control use seeks. Corrections wait for the latest source to load and become seekable, and player events cannot echo corrected state back as fresh commands. Buffering players catch up after readiness; blocked autoplay requires a user gesture. Browser and benchmark success does not certify a provider's server-side player policies.
+For native media, 100-ms drift checks seek after 500 ms, use bounded ±5% rate correction for moderate drift, and reset to normal when stable. Provider players with discrete or unreliable rate control use seeks. Corrections wait for the latest source to load and become seekable. A player starts/resumes before seeking; buffering or a pending seek prevents repeated correction commands. YouTube playback promises settle on actual playing/autoplay events, host iframe play/pause/seek actions synchronize through the server, and retry recreates its iframe. Player events cannot echo corrected state back as fresh commands. Buffering players catch up after readiness; blocked autoplay requires a user gesture. Browser and benchmark success does not certify a provider's server-side player policies.
 
 Resource bounds: 32 people and 500 rooms; 100 recent chat messages, 50 queued items, 10 polls and 50 bookmarks per room; 20 socket commands per second per connection; 16 KiB maximum socket event. Custom URLs are parsed and restricted to known provider paths or direct media formats. The application does not fetch arbitrary custom sources from its server.
 
@@ -111,3 +112,7 @@ Resource bounds: 32 people and 500 rooms; 100 recent chat messages, 50 queued it
 - [VIVA.md](VIVA.md): concise synchronization and reliability presentation notes.
 - [PROGRESS.md](PROGRESS.md): completion notes.
 - [FOYER-PLAN.md](FOYER-PLAN.md): scoped launch checklist and evidence.
+
+## Latest playback and layout fixes
+
+Discovery now sits in the right sidebar, while **Add a link to the room** is directly below the player. The provider player keeps its full width and recovery feedback below it. `tests/browser/youtube.spec.ts` uses a deterministic asynchronous IFrame API fixture to verify two-client buffering, host native controls, feedback-loop prevention, autoplay recovery, retry and YouTube Music queue/Listen behavior. This fixture is separate from `npm run providers:youtube`, which checks actual network playback of the official YouTube API demo and saves `evidence/youtube-live.json`. Override `YOUTUBE_TEST_URL` to check another publicly embeddable video; its availability is controlled by YouTube. Latest checks passed: 35 unit/protocol tests and 4 browser workflows. Production source maps are optional (`FOYER_SOURCEMAPS=1` when building).

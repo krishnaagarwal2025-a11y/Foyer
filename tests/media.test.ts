@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isPlayable, normalizeSource } from "../shared/media";
+import {
+  isPlayable,
+  isListeningSource,
+  normalizeSource,
+} from "../shared/media";
 
 describe("provider-aware media links", () => {
   it("normalizes YouTube watch, short, and Shorts URLs to visible embeds", () => {
@@ -22,9 +26,9 @@ describe("provider-aware media links", () => {
     expect(normalizeSource("https://vimeo.com/123456789").provider).toBe(
       "vimeo",
     );
-    expect(
-      normalizeSource("https://soundcloud.com/artist/song").kind,
-    ).toBe("audio");
+    expect(normalizeSource("https://soundcloud.com/artist/song").kind).toBe(
+      "audio",
+    );
     expect(normalizeSource("https://media.example/show.m3u8").provider).toBe(
       "direct",
     );
@@ -46,14 +50,25 @@ describe("provider-aware media links", () => {
     );
   });
 
+  it("accepts individual YouTube Music songs for Listen without hiding their video", () => {
+    const song = normalizeSource(
+      "https://music.youtube.com/watch?v=abcdefghijk&list=RDAMVMabcdefghijk",
+    );
+    expect(song.url).toBe("https://www.youtube.com/watch?v=abcdefghijk");
+    expect(song.kind).toBe("video");
+    expect(isListeningSource(song)).toBe(true);
+    expect(
+      isListeningSource(normalizeSource("https://example.org/movie.mp4")),
+    ).toBe(false);
+    expect(() =>
+      normalizeSource("https://music.youtube.com/playlist?list=PL123"),
+    ).toThrow(/link/i);
+  });
+
   it("identifies commercial services as extension-controlled sources", () => {
     const services = [
       ["https://www.netflix.com/watch/8123456789", "netflix", "8123456789"],
-      [
-        "https://www.primevideo.com/detail/B0C1234567",
-        "prime",
-        "B0C1234567",
-      ],
+      ["https://www.primevideo.com/detail/B0C1234567", "prime", "B0C1234567"],
       [
         "https://www.amazon.in/gp/video/detail/B0C1234567",
         "prime",

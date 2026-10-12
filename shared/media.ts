@@ -3,6 +3,10 @@ export const externalProviders = ["netflix", "prime", "hotstar"];
 export function isPlayable(movie: Movie) {
   return Boolean(movie.url || movie.sourceId);
 }
+// YouTube songs retain the full visible official video player in Listen rooms.
+export function isListeningSource(movie: Movie) {
+  return movie.kind === "audio" || movie.provider === "youtube";
+}
 export function normalizeSource(
   raw: string,
   title = "Untitled",
@@ -41,7 +45,9 @@ export function normalizeSource(
             ? parts[1]
             : undefined);
     if (!sourceId || !/^[\w-]{11}$/.test(sourceId))
-      throw Error("Use a YouTube video or Shorts link.");
+      throw Error(
+        "Use a YouTube video, Shorts, or individual YouTube Music song link with a video ID.",
+      );
     url.href = `https://www.youtube.com/watch?v=${sourceId}`;
   } else if (
     ["vimeo.com", "www.vimeo.com", "player.vimeo.com"].includes(host)

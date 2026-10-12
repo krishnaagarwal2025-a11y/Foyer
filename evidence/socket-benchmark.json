@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-12T07:25:23.174Z",
+  "timestamp": "2026-10-12T08:12:30.119Z",
   "transport": "Socket.IO WebSocket, socket-only; no HTML5 playback",
   "url": "http://127.0.0.1:3001",
   "participants": 10,
@@ -20,9 +20,9 @@
   },
   "deliveryMs": {
     "samples": 810,
-    "p50": 4.704099999999926,
-    "p95": 5.4036000000005515,
-    "maximum": 6.432299999999941
+    "p50": 5.268900000000031,
+    "p95": 6.948800000000119,
+    "maximum": 10.349199999999655
   },
   "targetP95Ms": 250,
   "passed": true

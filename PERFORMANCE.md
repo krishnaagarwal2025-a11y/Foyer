@@ -4,10 +4,10 @@ Final runs: **12 October 2026, Asia/Calcutta**. Raw JSON retains UTC timestamps.
 
 | Measurement | Samples | p50 | p95 | Maximum |
 |---|---:|---:|---:|---:|
-| Ten socket clients: control delivery | 810 | 4.70 ms | **5.40 ms** | 6.43 ms |
-| Ten isolated browsers: control event delivery | 270 | 6.37 ms | **8.77 ms** | 18.89 ms |
-| Ten isolated browsers: player state application | 270 | 16.61 ms | **29.87 ms** | 39.29 ms |
-| Ten isolated browsers: absolute playback drift after correction | 300 | 40.55 ms | **57.26 ms** | **61.34 ms** |
+| Ten socket clients: control delivery | 810 | 5.27 ms | **6.95 ms** | 10.35 ms |
+| Ten isolated browsers: control event delivery | 270 | 7.44 ms | **10.53 ms** | 14.24 ms |
+| Ten isolated browsers: player state application | 270 | 27.04 ms | **122.44 ms** | 129.74 ms |
+| Ten isolated browsers: absolute playback drift after correction | 300 | 42.58 ms | **65.50 ms** | 74.53 ms |
 
 The final run met the ≤250 ms p95 **control delivery** target and the ≤500 ms **corrected drift** target under these conditions. Player-state application also measured below 250 ms p95. This does **not** establish performance on a real LAN, arbitrary media, mobile devices, other browsers or video frame presentation timestamps.
 
@@ -19,13 +19,13 @@ The final run met the ≤250 ms p95 **control delivery** target and the ≤500 m
 - Local generated **90-second 320×180, 15 fps H.264/AAC** MP4, approximately 3 MiB. Keyframe interval: 15 frames (one second); fast-start MP4. No external media host or DRM.
 - Exact final media size: 3,168,063 bytes. SHA-256: `5348e60191423e7989f88c0288ea4cc201945fa29f5091f123937ce371256b2a`.
 - Browser autoplay explicitly enabled by `--autoplay-policy=no-user-gesture-required`; video elements muted. Background timer/render throttling disabled by the flags listed in the raw report. Browser policy in an ordinary interactive browser may differ.
-- No artificial network delay/loss or bandwidth throttling. Other desktop applications were present; actual CPU utilization was not recorded. Windows `os.loadavg()` returns zeros and must not be interpreted as an idle CPU. Final browser report recorded 4.19 GiB free physical memory at completion.
+- No artificial network delay/loss or bandwidth throttling. Other desktop applications were present; actual CPU utilization was not recorded. Windows `os.loadavg()` returns zeros and must not be interpreted as an idle CPU. Final browser report recorded 4.28 GiB free physical memory at completion.
 
 ## Method
 
 `npm run benchmark` creates ten real Socket.IO WebSocket connections. After one second and nine warm-up controls, it sends 90 controls (30 play, 30 pause, 30 seek), roughly 70 ms apart. Start is measured on the controller before recipient listener registration and host emission; end is each of the nine recipients' complete state callbacks. Listener setup overhead is included. Both timestamps use **the same Node monotonic clock**, so no cross-machine wall-clock subtraction occurs. 90 × 9 = 810 samples. This measures transport/state propagation, **not video playback**.
 
-`npm run benchmark:browser` creates ten isolated browser contexts, loads the real React application and real HTML5 media, joins a room through its UI, and sends 30 controls after six warm-ups. Each page's monotonic clock is calibrated to the controller's monotonic clock using the midpoint of the fastest of seven Playwright evaluations. The final calibration RTT maximum was **2.09 ms**, giving an approximate midpoint uncertainty of 1.04 ms; network asymmetry is still a limitation.
+`npm run benchmark:browser` creates ten isolated browser contexts, loads the real React application and real HTML5 media, joins a room through its UI, and sends 30 controls after six warm-ups. Each page's monotonic clock is calibrated to the controller's monotonic clock using the midpoint of the fastest of seven Playwright evaluations. The final calibration RTT maximum was **2.19 ms**, giving an approximate midpoint uncertainty of 1.10 ms; network asymmetry is still a limitation.
 
 - **Start:** the host application's actual command-dispatch event, before its socket emit.
 - **Delivery end:** the recipient's actual Socket.IO state handler for the corresponding operation ID.
@@ -36,9 +36,9 @@ Delivery and application exclude the sender: 30 × 9 = **270 samples each**, wit
 
 | Browser control | Recipient samples | Delivery p95 | Application p95 |
 |---|---:|---:|---:|
-| Play | 90 | 7.22 ms | 19.09 ms |
-| Pause | 90 | 13.37 ms | 21.59 ms |
-| Seek | 90 | 7.27 ms | 32.72 ms |
+| Play | 90 | 13.98 ms | 33.24 ms |
+| Pause | 90 | 10.84 ms | 127.43 ms |
+| Seek | 90 | 8.82 ms | 41.84 ms |
 
 The browser test suite separately verifies playing late joins, offline reconnect/resync, correction after deliberately setting a player's currentTime to zero, and recovery after a missing media source. Autoplay failure handling is tested by injecting a rejected play promise and restoring normal play on the user gesture; this verifies the recovery path, not every browser's real autoplay policy. The third-party players and streaming adapters are excluded from these performance figures: provider buffering, iframe event timing and platform policies need their own measurements.
 
@@ -80,3 +80,7 @@ Early concurrent checks and ten isolated contexts exceeded the Windows commit bu
 Initial reports had incomplete application samples because diagnostics replaced the latest operation marker; the recorder now retains the pending playback operation and requires the appropriate version. Earlier complete runs also measured application p95 around 531–585 ms. The final implementation uses readiness-triggered checks, a cached-source readiness reconciliation, 100 ms fallback correction, a one-second-keyframe local clip and direct read-only clock telemetry. Machine memory conditions improved as well, so gains cannot be attributed to one change alone. Earlier JSON reports are retained with explanatory names and are not the final evidence.
 
 Disconnection grace is 15 seconds; host replacement is deterministic after expiry. Reconnect restores complete authoritative state. Commands are not queued offline; timed-out commands retry once with the same operation ID when connected. Buffering/autoplay/source failures show recovery feedback. See README for full failure handling, resource bounds, and the limited deduplication window.
+
+## Provider playback follow-up
+
+The YouTube repair was verified separately on 12 October 2026: `npm run providers:youtube` loaded and played the official API demo (`M7lc1UVf-VE`), observed 38 matching player-state samples and progression to 5.1 seconds, and retained no error/buffering feedback. `evidence/youtube-live.json` and its screenshot preserve the actual result. The embedded HTML5 video was also observed playing at readyState 4, with decoded size 854×480 and rendered size 808×454. This one-page smoke check used autoplay-enabled Chromium and does not certify every video, account, network, player or multi-user YouTube timing. Four automated browser workflows passed, including a two-context asynchronous YouTube API fixture. The ten-user figures above were refreshed after the playback correction changes using the local MP4; third-party playback remains excluded from those numbers.

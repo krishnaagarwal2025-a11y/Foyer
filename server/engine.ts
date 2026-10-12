@@ -1,7 +1,11 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { catalog } from "./catalog";
-import { normalizeSource, isPlayable } from "../shared/media";
+import {
+  normalizeSource,
+  isPlayable,
+  isListeningSource,
+} from "../shared/media";
 import {
   expectedPosition,
   type Room,
@@ -352,7 +356,7 @@ export class Engine {
         .filter(
           (q) =>
             isPlayable(q.movie) &&
-            (r.settings.mode !== "listen" || q.movie.kind === "audio"),
+            (r.settings.mode !== "listen" || isListeningSource(q.movie)),
         )
         .sort((a, b) => b.votes.length - a.votes.length)[0];
       if (winner) {
@@ -366,7 +370,7 @@ export class Engine {
       case "mode":
         r.settings.mode = c.mode;
         if (c.mode === "listen")
-          r.queue = r.queue.filter((item) => item.movie.kind === "audio");
+          r.queue = r.queue.filter((item) => isListeningSource(item.movie));
         setMedia(
           catalog.find(
             (m) => m.id === (c.mode === "listen" ? "demo-audio" : "local-demo"),
@@ -383,10 +387,11 @@ export class Engine {
             error: error instanceof Error ? error.message : "Invalid source.",
           };
         }
-        if (r.settings.mode === "listen" && movie.kind !== "audio")
+        if (r.settings.mode === "listen" && !isListeningSource(movie))
           return {
             ok: false,
-            error: "Listen rooms accept audio sources only.",
+            error:
+              "Listen rooms accept audio or YouTube song links (with visible video).",
           };
         if (c.enqueue) {
           if (r.queue.length >= 50)
@@ -404,7 +409,7 @@ export class Engine {
             ok: false,
             error: "Search the music library again before adding this track.",
           };
-        if (r.settings.mode === "listen" && movie.kind !== "audio")
+        if (r.settings.mode === "listen" && !isListeningSource(movie))
           return { ok: false, error: "Listen rooms accept audio tracks only." };
         if (c.enqueue) {
           if (r.queue.length >= 50)
@@ -443,7 +448,7 @@ export class Engine {
         const movie = catalog.find((m) => m.id === c.movieId);
         if (!movie) return { ok: false, error: "Unknown catalog item." };
         if (c.type === "media") {
-          if (r.settings.mode === "listen" && movie.kind !== "audio")
+          if (r.settings.mode === "listen" && !isListeningSource(movie))
             return { ok: false, error: "Switch to Watch mode for this video." };
           if (!isPlayable(movie))
             return {
@@ -452,7 +457,7 @@ export class Engine {
             };
           setMedia(movie);
         } else {
-          if (r.settings.mode === "listen" && movie.kind !== "audio")
+          if (r.settings.mode === "listen" && !isListeningSource(movie))
             return {
               ok: false,
               error: "Listen rooms accept audio tracks only.",

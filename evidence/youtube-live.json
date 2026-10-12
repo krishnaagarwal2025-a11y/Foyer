@@ -1,0 +1,28 @@
+{
+  "startedAt": "2026-10-12T08:30:58.055Z",
+  "source": "https://www.youtube.com/watch?v=M7lc1UVf-VE",
+  "url": "http://127.0.0.1:3001",
+  "passed": true,
+  "limitations": "Live external-service smoke test, one Chromium page on localhost. Video availability and autoplay are provider-dependent; not a synchronization benchmark.",
+  "embedLoaded": true,
+  "appliedSamples": 38,
+  "positionSeconds": "5.1",
+  "playerBounds": {
+    "x": 52.1875,
+    "y": -229,
+    "width": 807.625,
+    "height": 454.28125
+  },
+  "videoElement": {
+    "currentTime": 5.324657,
+    "paused": false,
+    "readyState": 4,
+    "videoWidth": 854,
+    "videoHeight": 480,
+    "renderedWidth": 808,
+    "renderedHeight": 454
+  },
+  "feedback": [],
+  "autoplayAction": false,
+  "completedAt": "2026-10-12T08:31:07.066Z"
+}

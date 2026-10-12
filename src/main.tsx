@@ -16,6 +16,7 @@ import {
   type Movie,
   type Result,
 } from "../shared/types";
+import { isListeningSource } from "../shared/media";
 import { acceptSnapshot as accept } from "../shared/sync";
 import "./style.css";
 import "./provider.css";
@@ -74,6 +75,7 @@ function App() {
     [drift, setDrift] = useState(0),
     [offset, setOffset] = useState(0),
     [blocked, setBlocked] = useState(false),
+    [playerAttempt, setPlayerAttempt] = useState(0),
     [videoError, setVideoError] = useState(""),
     [position, setPosition] = useState(0),
     [reactions, setReactions] = useState<
@@ -86,6 +88,7 @@ function App() {
     video = useRef<PlaybackHandle | null>(null),
     latest = useRef<Room | null>(null),
     offsetRef = useRef(0),
+    blockedRef = useRef(false),
     resume = useRef<{ code: string; name: string } | null>(null),
     loadedRevision = useRef(-1),
     syncRef = useRef<() => void>(() => {}),
@@ -97,6 +100,7 @@ function App() {
     } | null>(null);
   latest.current = room;
   selfRef.current = self;
+  blockedRef.current = blocked;
   const join = useCallback(
     (roomCode?: string) => {
       const s = socket.current;
@@ -316,6 +320,22 @@ function App() {
       delta = expected - v.currentTime;
     setDrift(delta);
     setPosition(v.currentTime);
+    // Provider buffering/seeking is asynchronous; repeated seeks/play calls can
+    // continually restart its download. Wait for the observed transition.
+    if (v.buffering || v.seeking) return;
+    // Start/resume first. Seeking a paused iframe before it has started can
+    // restart its buffer on every correction and prevent it ever catching up.
+    if (r.playing && v.paused) {
+      if (!blockedRef.current)
+        v.play()
+          .then(() => setBlocked(false))
+          .catch(() => setBlocked(true));
+      return;
+    }
+    if (!r.playing && !v.paused) {
+      v.pause();
+      return;
+    }
     const fix = correction(delta, r.playing);
     if (v.supportsRate === false) {
       fix.rate = 1;
@@ -327,12 +347,6 @@ function App() {
       } catch {}
     }
     v.playbackRate = fix.rate;
-    if (r.playing && v.paused) {
-      v.play()
-        .then(() => setBlocked(false))
-        .catch(() => setBlocked(true));
-    }
-    if (!r.playing && !v.paused) v.pause();
     if (
       r.version >= (playbackOperation.current?.version ?? -1) &&
       !v.seeking &&
@@ -428,7 +442,7 @@ function App() {
   }, [canControl, command, synchronize]);
   const preferences = room?.participants.flatMap((p) => p.preferences) || [];
   const scored = catalog
-    .filter((m) => room?.settings.mode !== "listen" || m.kind === "audio")
+    .filter((m) => room?.settings.mode !== "listen" || isListeningSource(m))
     .map((m) => {
       const matches = preferences.filter(
         (p) => m.genres.includes(p) || m.tags.includes(p),
@@ -645,12 +659,27 @@ function App() {
             </button>
           </div>
           <div className="player">
-            <Suspense fallback={<div className="provider-loading" role="status">Loading room player…</div>}>
+            <Suspense
+              fallback={
+                <div className="provider-loading" role="status">
+                  Loading room player…
+                </div>
+              }
+            >
               <FoyerPlayer
+                key={`${room.mediaRevision}:${playerAttempt}`}
                 ref={video}
                 media={room.media}
                 revision={room.mediaRevision}
                 muted={muted}
+                onProviderControl={(type, position) => {
+                  const current = latest.current;
+                  if (!current || !canControl) return false;
+                  if (type !== "seek" && current.playing === (type === "play"))
+                    return false;
+                  command(type === "seek" ? { type, position } : { type });
+                  return true;
+                }}
                 onReady={() => {
                   loadedRevision.current = room.mediaRevision;
                   setVideoError("");
@@ -719,8 +748,10 @@ function App() {
                 {videoError}
                 <button
                   onClick={() => {
-                    video.current?.load();
+                    loadedRevision.current = -1;
+                    setBlocked(false);
                     setVideoError("Retrying source…");
+                    setPlayerAttempt((attempt) => attempt + 1);
                   }}
                 >
                   Retry source
@@ -728,7 +759,13 @@ function App() {
                 {host && (
                   <button
                     onClick={() =>
-                      command({ type: "media", movieId: "local-demo" })
+                      command({
+                        type: "media",
+                        movieId:
+                          room.settings.mode === "listen"
+                            ? "demo-audio"
+                            : "local-demo",
+                      })
                     }
                   >
                     Use local demo
@@ -852,131 +889,12 @@ function App() {
           )}
           {!cinema && (
             <>
-              {room.settings.mode === "listen" && (
-                <Suspense fallback={<div className="panel" role="status">Loading music discovery…</div>}>
-                  <MusicDiscovery
-                    command={command}
-                    canControl={canControl}
-                    connected={status === "Connected"}
-                  />
-                </Suspense>
-              )}
-              <section className="discovery panel">
-                <div className="section-heading">
-                  <div>
-                    <div className="eyebrow">
-                      FIND YOUR NEXT SHARED OBSESSION
-                    </div>
-                    <h2>
-                      {room.settings.mode === "listen"
-                        ? "Your local listening library."
-                        : "Something for everyone."}
-                    </h2>
-                  </div>
-                  <span className="pill">{catalog.length} SAMPLE TITLES</span>
-                </div>
-                <div className="search-row">
-                  <input
-                    aria-label="Search movies"
-                    placeholder="⌕ Search titles, genres or moods…"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                  />
-                  <select
-                    aria-label="Filter genre"
-                    value={filter}
-                    onChange={(e) => setFilter(e.target.value)}
-                  >
-                    {["All", ...genres, ...moods].map((g) => (
-                      <option key={g}>{g}</option>
-                    ))}
-                  </select>
-                  <label className="check">
-                    <input
-                      type="checkbox"
-                      checked={playable}
-                      onChange={(e) => setPlayable(e.target.checked)}
-                    />
-                    Playable only
-                  </label>
-                </div>
-                <p className="muted">
-                  Recommendations count matching preferences across your group.
-                  Sample concepts are discovery metadata; only cards marked
-                  playable have video.
-                </p>
-                <div className="movie-grid">
-                  {movies.slice(0, 12).map((m, i) => (
-                    <article className="movie" key={m.id}>
-                      <div
-                        className="movie-art"
-                        style={
-                          { "--movie-color": m.color } as React.CSSProperties
-                        }
-                      >
-                        <span className="movie-number">
-                          {String(i + 1).padStart(2, "0")}
-                        </span>
-                        <span>
-                          {m.url
-                            ? m.kind === "audio"
-                              ? "♪ LOCAL AUDIO"
-                              : "▶ LOCAL & PLAYABLE"
-                            : "DISCOVERY SAMPLE"}
-                        </span>
-                        <strong>{m.title}</strong>
-                      </div>
-                      <h3>{m.title}</h3>
-                      <small>
-                        {m.genres.join(" · ")} · {Math.round(m.duration / 60)}{" "}
-                        min
-                      </small>
-                      <p>{m.description}</p>
-                      {m.score > 0 && (
-                        <p className="match">
-                          ✦ {m.score} preference matches: {m.why}
-                        </p>
-                      )}
-                      <div className="card-actions">
-                        <button
-                          disabled={status !== "Connected"}
-                          onClick={() =>
-                            command({ type: "enqueue", movieId: m.id })
-                          }
-                        >
-                          ＋ Queue
-                        </button>
-                        {m.url && (
-                          <button
-                            disabled={!canControl}
-                            onClick={() =>
-                              command({ type: "media", movieId: m.id })
-                            }
-                          >
-                            Watch
-                          </button>
-                        )}
-                      </div>
-                    </article>
-                  ))}
-                </div>
-                {!movies.length && (
-                  <div className="empty">
-                    No matches. Try another title, genre or mood.
-                  </div>
-                )}
-                {movies.length > 12 && (
-                  <p className="muted">
-                    Showing the top 12 matches. Narrow your search to find more.
-                  </p>
-                )}
-              </section>
               <section className="panel source-panel">
                 <h3>Add a link to the room</h3>
                 <p className="muted">
-                  Paste YouTube, Vimeo, SoundCloud, direct audio/video or
-                  on-demand HLS. Subscription titles open in the companion
-                  extension. Players confirm duration when available.
+                  Paste YouTube / YouTube Music, Vimeo, SoundCloud, direct
+                  audio/video or on-demand HLS. Subscription titles open in the
+                  companion extension. Players confirm duration when available.
                 </p>
                 <form
                   onSubmit={(e) => {
@@ -1020,7 +938,9 @@ function App() {
                     required
                   />
                   <button name="action" value="play" disabled={!canControl}>
-                    {room.settings.mode === "listen" ? "Play audio" : "Load video"}
+                    {room.settings.mode === "listen"
+                      ? "Play audio"
+                      : "Load video"}
                   </button>
                   <button
                     name="action"
@@ -1036,6 +956,129 @@ function App() {
         </section>
         {!cinema && (
           <aside className="sidebar">
+            {room.settings.mode === "listen" && (
+              <Suspense
+                fallback={
+                  <div className="panel" role="status">
+                    Loading music discovery…
+                  </div>
+                }
+              >
+                <MusicDiscovery
+                  command={command}
+                  canControl={canControl}
+                  connected={status === "Connected"}
+                />
+              </Suspense>
+            )}
+            <section className="discovery panel">
+              <div className="section-heading">
+                <div>
+                  <div className="eyebrow">FIND YOUR NEXT SHARED OBSESSION</div>
+                  <h2>
+                    {room.settings.mode === "listen"
+                      ? "Your local listening library."
+                      : "Something for everyone."}
+                  </h2>
+                </div>
+                <span className="pill">{catalog.length} SAMPLE TITLES</span>
+              </div>
+              <div className="search-row">
+                <input
+                  aria-label="Search movies"
+                  placeholder="⌕ Search titles, genres or moods…"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+                <select
+                  aria-label="Filter genre"
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                >
+                  {["All", ...genres, ...moods].map((g) => (
+                    <option key={g}>{g}</option>
+                  ))}
+                </select>
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={playable}
+                    onChange={(e) => setPlayable(e.target.checked)}
+                  />
+                  Playable only
+                </label>
+              </div>
+              <p className="muted">
+                Recommendations count matching preferences across your group.
+                Sample concepts are discovery metadata; only cards marked
+                playable have video.
+              </p>
+              <div className="movie-grid">
+                {movies.slice(0, 12).map((m, i) => (
+                  <article className="movie" key={m.id}>
+                    <div
+                      className="movie-art"
+                      style={
+                        { "--movie-color": m.color } as React.CSSProperties
+                      }
+                    >
+                      <span className="movie-number">
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      <span>
+                        {m.url
+                          ? m.kind === "audio"
+                            ? "♪ LOCAL AUDIO"
+                            : "▶ LOCAL & PLAYABLE"
+                          : "DISCOVERY SAMPLE"}
+                      </span>
+                      <strong>{m.title}</strong>
+                    </div>
+                    <h3>{m.title}</h3>
+                    <small>
+                      {m.genres.join(" · ")} · {Math.round(m.duration / 60)} min
+                    </small>
+                    <p>{m.description}</p>
+                    {m.score > 0 && (
+                      <p className="match">
+                        ✦ {m.score} preference matches: {m.why}
+                      </p>
+                    )}
+                    <div className="card-actions">
+                      <button
+                        disabled={status !== "Connected"}
+                        onClick={() =>
+                          command({ type: "enqueue", movieId: m.id })
+                        }
+                      >
+                        ＋ Queue
+                      </button>
+                      {m.url && (
+                        <button
+                          disabled={!canControl}
+                          onClick={() =>
+                            command({ type: "media", movieId: m.id })
+                          }
+                        >
+                          Watch
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                ))}
+              </div>
+              {!movies.length && (
+                <div className="empty">
+                  No matches. Try another title, genre or mood.
+                </div>
+              )}
+              {movies.length > 12 && (
+                <p className="muted">
+                  Showing the top 12 matches. Narrow your search to find more.
+                </p>
+              )}
+            </section>
+
             <section className="panel participants">
               <div className="section-heading">
                 <h2>The audience</h2>
