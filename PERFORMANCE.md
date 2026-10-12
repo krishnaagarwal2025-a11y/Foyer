@@ -120,3 +120,16 @@ The handshake-enabled localhost run used 10 isolated Chromium contexts, three ac
 Raw reports: `evidence/protocol-local-socket.json` and `evidence/protocol-local-browser.json`. RTT-based offset assumes symmetric routes; it is an estimate. Loopback is not a physical LAN test. Real Redis coordination was separately verified with two backend processes; that report is protocol-only and uses synthetic readiness. See SYNCHRONIZATION.md for the bounded missing-device policy and scheduled-anchor algorithm. Public deployment results are kept in separate reports.
 
 The initial sequential public handshake missed the delivery target: socket p95 396.15 ms and browser p95 407.50 ms. Drift remained below 170 ms maximum. Those failed delivery runs are preserved as `protocol-vercel-sequential-socket.json` and `protocol-vercel-sequential-browser.json`. The final protocol issues the three timestamped exchanges concurrently to avoid accumulating three network waits. The local table above is the optimized rerun; public optimized results are recorded separately. Source readiness is reported by the client/player API; the server measures RTT and validates membership. Provider-native buffering may begin on playback even after API readiness.
+
+## Final optimized public protocol run
+
+URL: https://foyer-cyan.vercel.app. Ten isolated Chromium contexts on the documented Windows machine connected over the Internet to the Vercel/Redis deployment. All seven public browser workflows passed; the final keyboard-disclosure and unavailable-YouTube-source regressions also passed locally. The source-unavailable case checks device delay and reports failure instead of claiming successful playback. Real public YouTube playback/manual sync succeeded separately. The extension package check passed, but its Windows browser fixture was skipped for the missing runtime; signed-in subscription playback remains unverified.
+
+| Measurement | Samples | p50 | p95 | Maximum |
+|---|---:|---:|---:|---:|
+| Public socket delivery, including concurrent preflight | 810 | 84.52 ms | 195.97 ms | 416.19 ms |
+| Public browser event delivery, including concurrent preflight | 270 | 59.67 ms | 208.89 ms | 235.64 ms |
+| Public player application, including common-start wait | 270 | 159.87 ms | 334.47 ms | 384.47 ms |
+| Public corrected absolute drift | 300 | 22.08 ms | 64.31 ms | 167.12 ms |
+
+The delivery and corrected-drift targets passed. Player application includes the intentionally scheduled waiting period and did not meet 250 ms p95 on this Internet run; event propagation is a separate metric. All expected samples arrived, no playback failures were reported, and browser clock-calibration maximum RTT was 3.03 ms. Autoplay was allowed, audio muted and background throttling disabled. This is one-machine Internet testing, not a physical LAN or a guarantee for every device/media source. Raw final reports: `evidence/protocol-vercel-socket.json`, `evidence/protocol-vercel-browser.json`, `evidence/protocol-vercel-check.json`, and `evidence/protocol-vercel-youtube.json`. Sequential failed-delivery reports are retained for comparison.

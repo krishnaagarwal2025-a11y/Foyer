@@ -249,6 +249,10 @@ test("YouTube buffering settles, native host actions synchronize, retry rebuilds
         .at(-1)
         .options.events.onError({ data: 100 }),
     );
+    await host.getByRole("button", { name: "Sync me now" }).click();
+    await expect(host.locator("#sync-feedback")).toContainText(
+      "source is unavailable",
+    );
     await host.getByRole("button", { name: "Retry source" }).click();
     await expect.poll(async () => (await fixtureState(host)).count).toBe(2);
     expect(

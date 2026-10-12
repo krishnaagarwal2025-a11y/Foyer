@@ -53,13 +53,13 @@
 ## Sync repair and room clarity review
 
 Checklist / plan:
-- [ ] Manual sync forces position/rate correction, retries blocked playback during the click gesture, and reports pending/success/error states.
-- [ ] Fetch a current membership-validated snapshot without changing global playback or granting guest control.
-- [ ] Keep player + chat as the default view; separate Discover and People views; collapse Add a link and secondary help.
-- [ ] Review source loading, disconnected states, keyboard shortcuts, accessible controls and responsive overflow.
-- [ ] Add regression coverage for manual sync in direct media and YouTube, including autoplay, modest drift and no command feedback.
-- [ ] Run unit/protocol, build, extension checks and multi-client browser flows; inspect refreshed screenshots.
-- [ ] Re-run ten-client benchmarks, document evidence, push main and redeploy the verified version.
+- [x] Manual sync forces position/rate correction, retries blocked playback during the click gesture, and reports pending/success/error states.
+- [x] Fetch a current membership-validated snapshot without changing global playback or granting guest control.
+- [x] Keep player + chat as the default view; separate Discover and People views; collapse Add a link and secondary help.
+- [x] Review source loading, disconnected states, keyboard shortcuts, accessible controls and responsive overflow.
+- [x] Add regression coverage for manual sync in direct media and YouTube, including autoplay, modest drift and no command feedback.
+- [x] Run unit/protocol, build, extension checks and multi-client browser flows; inspect refreshed screenshots.
+- [x] Re-run ten-client benchmarks, document evidence, push main and redeploy the verified version.
 Assumptions: manual sync affects only the clicking participant. Existing room controls, provider policies and host permissions remain authoritative. Discovery defaults to playable media, with all sample metadata available through the filter.
 
 Sync review verification:
@@ -90,3 +90,10 @@ Protocol final local verification:
 - Public sequential preflight socket run missed target: p95 396.15ms (preserved as protocol-vercel-sequential-socket.json). Optimizing three exchanges to run concurrently, preserving independent timestamps, fastest RTT, and most recent readiness. Rerun pending.
 
 - Concurrent exchange optimization passes 51 unit tests; all seven local workflows verified (one transient screenshot write failure passed on targeted retry). Local optimized socket p95 23.46ms; ten-browser delivery p95 54.38ms, application p95 171.84ms, max drift 151.65ms. Publishing optimization for public rerun.
+
+Final public verification:
+- Optimized protocol deployed successfully to https://foyer-cyan.vercel.app. Public protocol checks and all seven public workflows pass.
+- Public ten-browser delivery p95 208.89ms; maximum corrected drift 167.12ms. Intentional scheduled-start wait yields application p95 334.47ms, recorded separately.
+- Final keyboard test prevents Space on Add a link from triggering Play; known source errors stop automatic retry loops and manual sync cannot claim success on an unavailable source. Both targeted regressions pass locally.
+- Unit tests: 51 pass; build/types/extension package pass; live YouTube playback/manual sync pass. Windows extension browser fixture skipped because its runtime cannot start; signed-in subscription playback unverified.
+- Source, documentation and raw successes/failures retained. Local demo remains running at port 3001. GitHub main and final Vercel update being completed.

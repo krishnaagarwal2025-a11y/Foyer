@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-12T16:52:20.173Z",
+  "timestamp": "2026-10-12T17:12:21.835Z",
   "url": "https://foyer-cyan.vercel.app",
   "participants": 10,
   "browser": "156.0.8078.4",
@@ -16,71 +16,71 @@
   "method": "Start: actual host command dispatch in app. Delivery: recipient Socket.IO state handler. Applied: first non-seeking video sample matching paused state and within 500ms of authoritative timeline, with a state version at least as new as the command. Browser clocks calibrated to a single Node monotonic clock using minimum RTT of 7 Playwright evaluations per page. Application sampled on command, playing/seeked/canplay events and each 100ms correction tick. Drift measured from HTML5 currentTime at least one second after each control; offset from app ping estimator via read-only clock telemetry.",
   "calibrationRoundTripMs": {
     "samples": 10,
-    "p50": 2.3847999999998137,
-    "p95": 2.995100000000093,
-    "maximum": 2.995100000000093
+    "p50": 2.5214999999998327,
+    "p95": 3.0266999999985273,
+    "maximum": 3.0266999999985273
   },
   "eventDeliveryMs": {
     "samples": 270,
-    "p50": 96.45249999701628,
-    "p95": 407.4966999992612,
-    "maximum": 449.8519499970207
+    "p50": 59.67129999478493,
+    "p95": 208.89415000000008,
+    "maximum": 235.64044999925682
   },
   "playerApplicationMs": {
     "samples": 270,
-    "p50": 160.25194999553787,
-    "p95": 568.2966999962737,
-    "maximum": 583.5802499992496
+    "p50": 159.86694999776228,
+    "p95": 334.4669499992524,
+    "maximum": 384.4669499992524
   },
   "byControlType": {
     "play": {
       "deliveryMs": {
         "samples": 90,
-        "p50": 347.93509999478556,
-        "p95": 444.2377499992508,
-        "maximum": 449.8519499970207
+        "p50": 150.24045000074693,
+        "p95": 232.4155499985136,
+        "maximum": 235.64044999925682
       },
       "applicationMs": {
         "samples": 90,
-        "p50": 419.98024999775953,
-        "p95": 571.2377499992508,
-        "maximum": 583.5802499992496
+        "p50": 254.61555000149383,
+        "p95": 372.094149999255,
+        "maximum": 384.4669499992524
       }
     },
     "pause": {
       "deliveryMs": {
         "samples": 90,
-        "p50": 53.18019999925309,
-        "p95": 111.55194999627565,
-        "maximum": 127.59669999701873
+        "p50": 47.74044999702164,
+        "p95": 99.1286999992517,
+        "maximum": 99.3444999992571
       },
       "applicationMs": {
         "samples": 90,
-        "p50": 160.25194999553787,
-        "p95": 226.78024999851186,
-        "maximum": 234.4966999992539
+        "p50": 159.86694999776228,
+        "p95": 219.27130000000034,
+        "maximum": 219.6286999992517
       }
     },
     "seek": {
       "deliveryMs": {
         "samples": 90,
-        "p50": 64.2377499955328,
-        "p95": 113.33509999702073,
-        "maximum": 113.58054999776505
+        "p50": 54.8406500007477,
+        "p95": 68.87129999776516,
+        "maximum": 124.51555000000371
       },
       "applicationMs": {
         "samples": 90,
-        "p50": 89.63774999776797,
-        "p95": 128.23509999553062,
-        "maximum": 128.93774999850575
+        "p50": 75.61555000149383,
+        "p95": 107.74449999776698,
+        "maximum": 131.16694999850733
       }
     }
   },
   "absoluteDriftMs": {
     "samples": 300,
-    "p50": 29.533423828119965,
-    "p95": 60.010814453125505,
-    "maximum": 169.57200390625005
+    "p50": 22.080007812501634,
+    "p95": 64.3079394531263,
+    "maximum": 167.12094335937522
   },
   "missingDeliverySamples": 0,
   "missingApplicationSamples": 0,
@@ -91,7 +91,7 @@
     "cpu": "AMD Ryzen 5 5500U with Radeon Graphics         ",
     "logicalCpus": 12,
     "totalMemoryGB": 15.339912414550781,
-    "freeMemoryGB": 4.347034454345703,
+    "freeMemoryGB": 5.471656799316406,
     "loadAverage": [
       0,
       0,
@@ -99,5 +99,5 @@
     ]
   },
   "limitations": "All clients share one measurement machine; deployment URL identifies loopback versus public hosting. Autoplay allowed by test flag and audio muted. Background throttling disabled. Player application criterion is state/timeline, not frame presentation timestamp. Clock calibration uncertainty approximately half calibration RTT. Windows load average does not reflect CPU load.",
-  "passed": false
+  "passed": true
 }

@@ -85,6 +85,15 @@ test("device packets precede common video/audio start, manual sync checks peers,
             ),
         )
         .toBe(true);
+    // Space opens an interactive disclosure without starting the room.
+    await host.locator(".source-panel > summary").focus();
+    await host.keyboard.press("Space");
+    await expect(host.getByLabel("Custom media URL")).toBeVisible();
+    expect(
+      (await state(host)).commands.filter((c: any) => c.type === "play"),
+    ).toHaveLength(0);
+    await host.keyboard.press("Space");
+    await expect(host.getByLabel("Custom media URL")).toBeHidden();
     await host.getByRole("button", { name: "Play", exact: true }).click();
     await expect
       .poll(() =>

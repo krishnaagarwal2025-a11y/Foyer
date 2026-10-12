@@ -36,6 +36,8 @@ const FoyerPlayer = lazy(() =>
     })),
   );
 const monotonic = () => performance.timeOrigin + performance.now();
+const sourceFailed = (message: string) =>
+  !!message && !/^(Loading|Retrying|Buffering)/i.test(message);
 const genres = [
   "Sci-Fi",
   "Drama",
@@ -101,6 +103,7 @@ function App() {
     latest = useRef<Room | null>(null),
     offsetRef = useRef(0),
     blockedRef = useRef(false),
+    videoErrorRef = useRef(""),
     resume = useRef<{ code: string; name: string } | null>(null),
     loadedRevision = useRef(-1),
     manualSync = useRef<{
@@ -120,6 +123,7 @@ function App() {
   latest.current = room;
   selfRef.current = self;
   blockedRef.current = blocked;
+  videoErrorRef.current = videoError;
   const join = useCallback(
     (roomCode?: string) => {
       const s = socket.current;
@@ -343,7 +347,8 @@ function App() {
             v.readyState >= 2 &&
             v.seekable.length > 0 &&
             !v.buffering &&
-            !v.seeking,
+            !v.seeking &&
+            !sourceFailed(videoErrorRef.current),
           autoplayBlocked: blockedRef.current,
         });
       },
@@ -477,6 +482,7 @@ function App() {
         "Sync could not finish. Check the source or retry when buffering stops.",
       );
     }
+    if (sourceFailed(videoErrorRef.current)) return;
     if (
       !r ||
       !v ||
@@ -628,6 +634,14 @@ function App() {
         );
         return;
       }
+      if (sourceFailed(videoErrorRef.current)) {
+        manualSync.current = null;
+        setSyncing(false);
+        setSyncMessage(
+          "Device delays checked, but this source is unavailable. Retry the source or choose another link.",
+        );
+        return;
+      }
       const current = accept(latest.current, result.room);
       if (result.synchronization) setLastCheck(result.synchronization);
       latest.current = current;
@@ -703,7 +717,9 @@ function App() {
         e.metaKey ||
         e.repeat ||
         (e.target instanceof HTMLElement &&
-          (/INPUT|TEXTAREA|SELECT|BUTTON/.test(e.target.tagName) ||
+          (/^(INPUT|TEXTAREA|SELECT|BUTTON|SUMMARY|A)$/.test(
+            e.target.tagName,
+          ) ||
             e.target.isContentEditable))
       )
         return;
