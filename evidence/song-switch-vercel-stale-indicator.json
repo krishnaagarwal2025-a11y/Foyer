@@ -1,0 +1,29 @@
+{
+  "url": "https://foyer-cyan.vercel.app",
+  "checkedAt": "2026-10-12T18:20:36.590Z",
+  "passed": false,
+  "switches": [
+    {
+      "title": "YouTube revision one",
+      "player": "youtube",
+      "currentTime": 2.152865,
+      "paused": false,
+      "readyState": 4,
+      "width": 854,
+      "height": 480
+    },
+    {
+      "title": "YouTube revision two",
+      "player": "youtube",
+      "currentTime": 2.152908,
+      "paused": false,
+      "readyState": 4,
+      "width": 854,
+      "height": 480
+    }
+  ],
+  "pageErrors": [],
+  "conditions": "One Chromium mobile/touch context (390×844), autoplay allowed. Public YouTube API demo repeatedly loaded under fresh room revisions, then local audio and back to YouTube. Not a physical phone or performance benchmark.",
+  "error": "Local audio interlude: provider did not play",
+  "completedAt": "2026-10-12T18:20:47.781Z"
+}

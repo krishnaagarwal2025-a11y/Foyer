@@ -30,3 +30,9 @@ Chat opens by default in **Room**. Use **Discover** for film/song search and **P
 ## Protocol demonstration
 
 Create a room in two browser contexts and open People on each. Press Play in Foyer: both receive three device checks; inspect the measured RTT/readiness rows and the temporary Starting together state. Repeat in Listen with the included audio demo. On the guest, press Sync me now: both devices are probed again, clock calibration updates, and only the guest's player is corrected. Turn one device offline or delay its responses to demonstrate bounded waiting and catch-up. Queue a playable item and use Play winner; enable automatic advancement to show that the next source also gets a prepared start. The RTT is round-trip delay, not an exact one-way delay.
+
+## Phone and song-switch checks
+
+Open the production link in a phone browser, create a room, and tap Listen. Playback has a seek row and separate play/sound/sync actions; Room, Discover and People fit under the player. Open Discover to paste individual YouTube Music links. Change songs repeatedly, including while the next player loads; the room and chat should remain visible. Toggle sound during loading and confirm the preference takes effect when ready. A second participant can tap Sync me now and send a chat message.
+
+For a repeatable live check, run `npm run providers:switch` with `DEMO_URL` set to the server being evaluated. It cycles public YouTube demo revisions, a direct local audio source, and back to YouTube, recording actual decoded/playing state plus uncaught browser errors. This checks provider lifecycle behavior rather than song-catalog availability or measured LAN latency.

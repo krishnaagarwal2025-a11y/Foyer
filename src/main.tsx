@@ -683,6 +683,8 @@ function App() {
     if (!room) return;
     loadedRevision.current = -1;
     playPending.current = false;
+    setPosition(expectedPosition(room, monotonic() + offsetRef.current));
+    setDrift(0);
     manualSync.current = null;
     setSyncing(false);
     setSyncMessage("");

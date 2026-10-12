@@ -1,4 +1,4 @@
-import { chromium } from "@playwright/test";
+import { chromium, expect } from "@playwright/test";
 import { writeFileSync } from "node:fs";
 
 // Real provider playback, separate from the SDK timing fixture. Reuse the public
@@ -61,13 +61,18 @@ try {
         : page.locator("audio");
     await media.waitFor({ state: "attached", timeout: 30000 });
     await page.getByRole("button", { name: "Play", exact: true }).click();
-    await page.waitForFunction(
-      () =>
-        Number(document.querySelector('[aria-label="Seek playback"]').value) >
-        2,
-      undefined,
-      { timeout: 30000 },
-    );
+    // Wait on the actual source rather than a displayed timeline that may still
+    // be transitioning when a new media element has just been mounted.
+    await expect
+      .poll(
+        () =>
+          media.evaluate(
+            (video) =>
+              !video.paused && video.readyState >= 2 && video.currentTime > 2,
+          ),
+        { timeout: 30000 },
+      )
+      .toBe(true);
     const state = await media.evaluate((video) => ({
       currentTime: video.currentTime,
       paused: video.paused,

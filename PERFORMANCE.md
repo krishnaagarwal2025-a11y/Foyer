@@ -133,3 +133,11 @@ URL: https://foyer-cyan.vercel.app. Ten isolated Chromium contexts on the docume
 | Public corrected absolute drift | 300 | 22.08 ms | 64.31 ms | 167.12 ms |
 
 The delivery and corrected-drift targets passed. Player application includes the intentionally scheduled waiting period and did not meet 250 ms p95 on this Internet run; event propagation is a separate metric. All expected samples arrived, no playback failures were reported, and browser clock-calibration maximum RTT was 3.03 ms. Autoplay was allowed, audio muted and background throttling disabled. This is one-machine Internet testing, not a physical LAN or a guarantee for every device/media source. Raw final reports: `evidence/protocol-vercel-socket.json`, `evidence/protocol-vercel-browser.json`, `evidence/protocol-vercel-check.json`, and `evidence/protocol-vercel-youtube.json`. Sequential failed-delivery reports are retained for comparison.
+
+## Song-switch and phone functional verification (2026-10-12)
+
+These are functional checks, not new latency benchmarks. Before the fix, a real public YouTube player played the first revision and the second revision crashed the page with `unMute is not a function` (`evidence/song-switch-vercel-before.json`). The cached SDK exposes volume methods only once its new iframe is ready; volume preferences now wait for readiness and old callbacks are ignored.
+
+The local live-provider report (`evidence/song-switch-local.json`) records four successful playing sources: two YouTube revisions, local audio, and YouTube again, followed by confirmed manual sync. YouTube frames decoded at 854×480; every source had readyState 4; no uncaught errors occurred. The same public API demo is reused under different revisions rather than claiming four distinct licensed songs.
+
+Two isolated mobile/touch-emulated Chromium contexts also exercise actual audio changes, playback, guest manual sync and chat. Seventeen layout checks cover Room/Discover/People/source entry at 320, 360, 390 and 430px and an 844px landscape viewport, without document overflow. Screenshots were visually inspected. Physical phones, Safari and realistic mobile network throttling are not covered. The prior ten-client delivery/drift measurements above are unchanged and are not relabeled as mobile benchmarks.

@@ -376,6 +376,7 @@ test("changing songs with a cached YouTube SDK never blanks host or guest", asyn
           page.getByRole("heading", { name: `Song ${i + 1}`, level: 1 }),
         ).toBeVisible();
         await expect(page.getByTitle("YouTube API fixture")).toBeVisible();
+        await expect(page.getByLabel("Seek playback")).toHaveValue("0");
       }
       // Change mute while the new iframe is still loading, then switch again.
       await host.getByRole("button", { name: "Toggle sound" }).click();

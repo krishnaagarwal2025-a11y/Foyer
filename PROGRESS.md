@@ -108,3 +108,6 @@ Completed: runtime source da7ab0a is deployed and final public protocol/YouTube 
 - Actual old public deployment reproduced the same failure on its second YouTube revision, after the first decoded/played: evidence/song-switch-vercel-before.json records `unMute is not a function`.
 - Mobile screenshot inspection completed. Actual audio playback, manual sync and chat pass in two touch-emulated contexts; all 17 layout checks have no horizontal overflow. Physical phones/Safari are not available for verification.
 - Publishing the verified fix and phone layout; live playback verification/redeployment results to follow.
+- Runtime c3bdde0 deployed as dpl_7hPtGaJFtkJ8VLobGsPAJsTBvwy2. Live public YouTube first and second revisions play without uncaught errors: the original crash is resolved.
+- Found a brief stale timeline display during source loading. Resetting the displayed position/drift immediately on revision change. The live smoke probe now waits for the actual media element to advance, rather than treating the displayed slider as readiness. First post-deployment probe retained as song-switch-vercel-stale-indicator.json; its audio assertion sampled too early.
+- Final targeted local and full public verification follows this small source-transition improvement.
