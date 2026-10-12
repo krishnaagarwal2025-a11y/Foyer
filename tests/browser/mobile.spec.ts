@@ -76,10 +76,12 @@ test("phone layouts fit at 320–430px and landscape while songs, sync and chat 
           page.getByRole("heading", { name: title, level: 1 }),
         ).toBeVisible();
         await expect
-          .poll(() =>
-            page
-              .locator("audio")
-              .evaluate((v: HTMLAudioElement) => v.readyState),
+          .poll(
+            () =>
+              page
+                .locator("audio")
+                .evaluate((v: HTMLAudioElement) => v.readyState),
+            { timeout: 20000 },
           )
           .toBeGreaterThanOrEqual(2);
       }
@@ -158,12 +160,32 @@ test("phone layouts fit at 320–430px and landscape while songs, sync and chat 
           layouts,
           pageErrors: errors,
           conditions:
-            "Two isolated Chromium contexts with mobile/touch emulation, actual local audio playback. Not a physical iPhone/Android or Safari test.",
+            "Two isolated Chromium contexts with mobile/touch emulation, autoplay allowed, actual bundled demo audio playback. Not a physical iPhone/Android or Safari test.",
+          mediaLoadingTimeoutMs: 20000,
         },
         null,
         2,
       ),
     );
+  } catch (failure) {
+    console.error(
+      "Phone media diagnostics",
+      await Promise.all(
+        [host, guest].map((page) =>
+          page
+            .locator("audio")
+            .evaluate((v: HTMLAudioElement) => ({
+              src: v.src,
+              currentSrc: v.currentSrc,
+              readyState: v.readyState,
+              networkState: v.networkState,
+              error: v.error?.message,
+            }))
+            .catch(() => null),
+        ),
+      ),
+    );
+    throw failure;
   } finally {
     await a.close();
     await b.close();

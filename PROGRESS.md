@@ -111,3 +111,10 @@ Completed: runtime source da7ab0a is deployed and final public protocol/YouTube 
 - Runtime c3bdde0 deployed as dpl_7hPtGaJFtkJ8VLobGsPAJsTBvwy2. Live public YouTube first and second revisions play without uncaught errors: the original crash is resolved.
 - Found a brief stale timeline display during source loading. Resetting the displayed position/drift immediately on revision change. The live smoke probe now waits for the actual media element to advance, rather than treating the displayed slider as readiness. First post-deployment probe retained as song-switch-vercel-stale-indicator.json; its audio assertion sampled too early.
 - Final targeted local and full public verification follows this small source-transition improvement.
+
+Completed song-switch/mobile update:
+- Public runtime f956ff7 deployed as dpl_DMaJNh8DL89uL87DPn4w9G3crd3p at https://foyer-cyan.vercel.app; source pushed to GitHub main.
+- Actual public YouTube → YouTube → direct audio → YouTube playback and manual sync pass, all media readyState 4, no uncaught errors. Before/after reports and screenshots retained.
+- 51 unit tests pass; all nine local workflows passed, plus all three targeted checks after immediate position reset. All nine public workflows verified: eight full-run passes and a successful phone retry after correcting its overly short 5s Internet media-load assertion to 20s. Diagnostics showed network loading without a media error and valid 206 audio/wave responses.
+- Mobile evidence records all 17 overflow checks, two touch contexts with audio/chat/manual sync, and visual inspection. Physical phones/Safari remain unverified; performance measurements were not rerun or relabeled as mobile benchmarks.
+- Local production demo remains running at http://localhost:3001. Final documentation/evidence push follows; no runtime blocker remains.
