@@ -97,3 +97,5 @@ Final public verification:
 - Final keyboard test prevents Space on Add a link from triggering Play; known source errors stop automatic retry loops and manual sync cannot claim success on an unavailable source. Both targeted regressions pass locally.
 - Unit tests: 51 pass; build/types/extension package pass; live YouTube playback/manual sync pass. Windows extension browser fixture skipped because its runtime cannot start; signed-in subscription playback unverified.
 - Source, documentation and raw successes/failures retained. Local demo remains running at port 3001. GitHub main and final Vercel update being completed.
+
+Completed: runtime source da7ab0a is deployed and final public protocol/YouTube regressions pass. GitHub main includes the source and measured evidence; local demo remains at http://localhost:3001. No core blocker remains; extension runtime/subscription verification limits are recorded above.
