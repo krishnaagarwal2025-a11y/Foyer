@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "Foyer Companion",
+  "version": "2.0.0",
+  "minimum_chrome_version": "116",
+  "description": "Connect your own Netflix, Prime Video and Hotstar playback to a Foyer room. Experimental platform adapters.",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "https://www.netflix.com/*",
+    "https://www.primevideo.com/*",
+    "https://www.amazon.com/*",
+    "https://www.amazon.in/*",
+    "https://www.amazon.co.uk/*",
+    "https://www.amazon.de/*",
+    "https://www.amazon.co.jp/*",
+    "https://www.hotstar.com/*",
+    "https://www.jiohotstar.com/*"
+  ],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "background": { "service_worker": "worker.js" },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Foyer Companion"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.netflix.com/*",
+        "https://www.primevideo.com/*",
+        "https://www.amazon.com/gp/video/*",
+        "https://www.amazon.in/gp/video/*",
+        "https://www.amazon.co.uk/gp/video/*",
+        "https://www.amazon.de/gp/video/*",
+        "https://www.amazon.co.jp/gp/video/*",
+        "https://www.hotstar.com/*",
+        "https://www.jiohotstar.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

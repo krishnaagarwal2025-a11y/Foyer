@@ -1,0 +1,29 @@
+.provider-attribution {
+  margin: 9px 2px 0;
+  color: #b9afc7;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.provider-attribution a {
+  color: #e1cfff;
+  text-underline-offset: 3px;
+}
+
+.provider-attribution a:focus-visible {
+  outline: 2px solid #e1cfff;
+  outline-offset: 3px;
+}
+
+.player:has(.provider-frame) {
+  min-width: 200px;
+  min-height: 240px;
+}
+
+.provider-loading {
+  display: grid;
+  min-height: 260px;
+  place-items: center;
+  color: #d6c0ed;
+  font-size: 13px;
+}

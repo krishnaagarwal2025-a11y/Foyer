@@ -1,0 +1,82 @@
+# Measured performance
+
+Final runs: **12 October 2026, Asia/Calcutta**. Raw JSON retains UTC timestamps. All measurements below are **localhost/loopback on one machine**, not a physical LAN or an internet deployment.
+
+| Measurement | Samples | p50 | p95 | Maximum |
+|---|---:|---:|---:|---:|
+| Ten socket clients: control delivery | 810 | 4.70 ms | **5.40 ms** | 6.43 ms |
+| Ten isolated browsers: control event delivery | 270 | 6.37 ms | **8.77 ms** | 18.89 ms |
+| Ten isolated browsers: player state application | 270 | 16.61 ms | **29.87 ms** | 39.29 ms |
+| Ten isolated browsers: absolute playback drift after correction | 300 | 40.55 ms | **57.26 ms** | **61.34 ms** |
+
+The final run met the ≤250 ms p95 **control delivery** target and the ≤500 ms **corrected drift** target under these conditions. Player-state application also measured below 250 ms p95. This does **not** establish performance on a real LAN, arbitrary media, mobile devices, other browsers or video frame presentation timestamps.
+
+## Conditions
+
+- Windows NT 10.0.26200; Node v24.15.0; AMD Ryzen 5 5500U; 12 logical CPUs; 15.34 GiB reported total memory.
+- Compiled Vite frontend and Express/Socket.IO/SQLite server served from `http://127.0.0.1:3001`; one server process, SQLite WAL, real persistence before room broadcast.
+- Chromium 156.0.8078.4, headless, **ten separate isolated browser contexts** and ten actual participants in one room. Final normal-mode run used the full room UI, not cinema-only rendering.
+- Local generated **90-second 320×180, 15 fps H.264/AAC** MP4, approximately 3 MiB. Keyframe interval: 15 frames (one second); fast-start MP4. No external media host or DRM.
+- Exact final media size: 3,168,063 bytes. SHA-256: `5348e60191423e7989f88c0288ea4cc201945fa29f5091f123937ce371256b2a`.
+- Browser autoplay explicitly enabled by `--autoplay-policy=no-user-gesture-required`; video elements muted. Background timer/render throttling disabled by the flags listed in the raw report. Browser policy in an ordinary interactive browser may differ.
+- No artificial network delay/loss or bandwidth throttling. Other desktop applications were present; actual CPU utilization was not recorded. Windows `os.loadavg()` returns zeros and must not be interpreted as an idle CPU. Final browser report recorded 4.19 GiB free physical memory at completion.
+
+## Method
+
+`npm run benchmark` creates ten real Socket.IO WebSocket connections. After one second and nine warm-up controls, it sends 90 controls (30 play, 30 pause, 30 seek), roughly 70 ms apart. Start is measured on the controller before recipient listener registration and host emission; end is each of the nine recipients' complete state callbacks. Listener setup overhead is included. Both timestamps use **the same Node monotonic clock**, so no cross-machine wall-clock subtraction occurs. 90 × 9 = 810 samples. This measures transport/state propagation, **not video playback**.
+
+`npm run benchmark:browser` creates ten isolated browser contexts, loads the real React application and real HTML5 media, joins a room through its UI, and sends 30 controls after six warm-ups. Each page's monotonic clock is calibrated to the controller's monotonic clock using the midpoint of the fastest of seven Playwright evaluations. The final calibration RTT maximum was **2.09 ms**, giving an approximate midpoint uncertainty of 1.04 ms; network asymmetry is still a limitation.
+
+- **Start:** the host application's actual command-dispatch event, before its socket emit.
+- **Delivery end:** the recipient's actual Socket.IO state handler for the corresponding operation ID.
+- **Application end:** the first player sample for that operation with sufficient data, no pending seek, the correct playing/paused state, a state version at least as new as that operation, and a timeline within 500 ms of expected. Observations run immediately on state and player readiness events and every 100 ms. This is a player-state criterion, not a measured display-frame timestamp.
+- **Drift:** independent sampling of actual `HTMLVideoElement.currentTime` for every participant at least one second after each command, compared with the authoritative anchor plus elapsed estimated server time. The application clock offset comes from its own repeated-ping estimator via read-only telemetry. This yields 30 × 10 = 300 samples. Measurements are point samples after correction, not a claim that transient seek drift always stays below 500 ms.
+
+Delivery and application exclude the sender: 30 × 9 = **270 samples each**, with **zero missing samples and zero recorded failures**. Quantiles use nearest rank on sorted samples. Small negative calibrated time differences would be clamped to zero; the reported distributions are comfortably above the calibration uncertainty.
+
+| Browser control | Recipient samples | Delivery p95 | Application p95 |
+|---|---:|---:|---:|
+| Play | 90 | 7.22 ms | 19.09 ms |
+| Pause | 90 | 13.37 ms | 21.59 ms |
+| Seek | 90 | 7.27 ms | 32.72 ms |
+
+The browser test suite separately verifies playing late joins, offline reconnect/resync, correction after deliberately setting a player's currentTime to zero, and recovery after a missing media source. Autoplay failure handling is tested by injecting a rejected play promise and restoring normal play on the user gesture; this verifies the recovery path, not every browser's real autoplay policy. The third-party players and streaming adapters are excluded from these performance figures: provider buffering, iframe event timing and platform policies need their own measurements.
+
+## Reproduce
+
+Start the compiled demo:
+
+```sh
+npm ci
+npm run build
+npm start
+```
+
+In another terminal:
+
+```sh
+npx playwright install chromium
+npm run benchmark
+npm run benchmark:browser
+```
+
+Outputs: `evidence/socket-benchmark.json` and `evidence/browser-benchmark.json`. Defaults: 10 clients, 90 socket commands, 30 browser commands. Environment overrides: `BENCH_URL`, `DEMO_URL`, `BENCH_CLIENTS`, `BENCH_COMMANDS`, `BROWSER_COMMANDS`. A low-memory fallback is available through `LOW_MEMORY=1`; it uses separate tabs/session identities in a shared context and cinema layout. Its report must not be described as isolated-context testing.
+
+For a real LAN repetition, run the production server on machine A and the benchmark controller on machine B on the same network. On B, in PowerShell:
+
+```powershell
+$env:BENCH_URL='http://SERVER_LAN_IP:3001'
+$env:DEMO_URL='http://SERVER_LAN_IP:3001'
+npm run benchmark
+npm run benchmark:browser
+```
+
+Record the actual network medium, server/client specifications, competing traffic, browser policies, media, and new results. This uses ten contexts on machine B; ten separate physical viewer devices require additional instrumentation/clock calibration and are not claimed by this script.
+
+## Failures, improvements and evidence
+
+Early concurrent checks and ten isolated contexts exceeded the Windows commit budget despite free physical RAM. This project's watchers were stopped; checks were serialized, Node benchmark heap/semi-space were bounded, and an explicit shared-context fallback was added. That completed fallback report is retained in `evidence/browser-benchmark-shared-context.json` (22.33 ms delivery p95, 64.53 ms application p95, 103.22 ms max drift). The machine later had enough commit available for the final ten-isolated-context run.
+
+Initial reports had incomplete application samples because diagnostics replaced the latest operation marker; the recorder now retains the pending playback operation and requires the appropriate version. Earlier complete runs also measured application p95 around 531–585 ms. The final implementation uses readiness-triggered checks, a cached-source readiness reconciliation, 100 ms fallback correction, a one-second-keyframe local clip and direct read-only clock telemetry. Machine memory conditions improved as well, so gains cannot be attributed to one change alone. Earlier JSON reports are retained with explanatory names and are not the final evidence.
+
+Disconnection grace is 15 seconds; host replacement is deterministic after expiry. Reconnect restores complete authoritative state. Commands are not queued offline; timed-out commands retry once with the same operation ID when connected. Buffering/autoplay/source failures show recovery feedback. See README for full failure handling, resource bounds, and the limited deduplication window.

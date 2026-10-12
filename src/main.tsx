@@ -1,0 +1,1437 @@
+import React, {
+  Suspense,
+  lazy,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+} from "react";
+import { createRoot } from "react-dom/client";
+import { io, type Socket } from "socket.io-client";
+import Fuse from "fuse.js";
+import {
+  expectedPosition,
+  correction,
+  type Room,
+  type Movie,
+  type Result,
+} from "../shared/types";
+import { acceptSnapshot as accept } from "../shared/sync";
+import "./style.css";
+import "./provider.css";
+import type { PlaybackHandle } from "./player/FoyerPlayer";
+const FoyerPlayer = lazy(() =>
+    import("./player/FoyerPlayer").then((module) => ({
+      default: module.FoyerPlayer,
+    })),
+  ),
+  MusicDiscovery = lazy(() =>
+    import("./MusicDiscovery").then((module) => ({
+      default: module.MusicDiscovery,
+    })),
+  );
+const monotonic = () => performance.timeOrigin + performance.now();
+const genres = [
+  "Sci-Fi",
+  "Drama",
+  "Animation",
+  "Documentary",
+  "Thriller",
+  "Adventure",
+  "Mystery",
+  "Comedy",
+];
+const moods = [
+  "Cozy",
+  "Wonder",
+  "Energetic",
+  "Thoughtful",
+  "Together",
+  "Escape",
+];
+const time = (n: number) =>
+  `${Math.floor(n / 60)}:${Math.floor(n % 60)
+    .toString()
+    .padStart(2, "0")}`;
+function App() {
+  const [room, setRoom] = useState<Room | null>(null),
+    [catalog, setCatalog] = useState<Movie[]>([]),
+    [name, setName] = useState(sessionStorage.getItem("name") || ""),
+    [code, setCode] = useState(
+      new URLSearchParams(location.search).get("room") || "",
+    ),
+    [status, setStatus] = useState("Connecting"),
+    [error, setError] = useState(""),
+    [joining, setJoining] = useState(false),
+    [self, setSelf] = useState(""),
+    [tab, setTab] = useState("Chat"),
+    [query, setQuery] = useState(""),
+    [filter, setFilter] = useState("All"),
+    [playable, setPlayable] = useState(false),
+    [cinema, setCinema] = useState(false),
+    [diagnostics, setDiagnostics] = useState(false),
+    [rtt, setRtt] = useState(0),
+    [drift, setDrift] = useState(0),
+    [offset, setOffset] = useState(0),
+    [blocked, setBlocked] = useState(false),
+    [videoError, setVideoError] = useState(""),
+    [position, setPosition] = useState(0),
+    [reactions, setReactions] = useState<
+      { id: string; emoji: string; name: string }[]
+    >([]),
+    [copied, setCopied] = useState(false),
+    [muted, setMuted] = useState(false),
+    [entryMode, setEntryMode] = useState<"watch" | "listen">("watch");
+  const socket = useRef<Socket | null>(null),
+    video = useRef<PlaybackHandle | null>(null),
+    latest = useRef<Room | null>(null),
+    offsetRef = useRef(0),
+    resume = useRef<{ code: string; name: string } | null>(null),
+    loadedRevision = useRef(-1),
+    syncRef = useRef<() => void>(() => {}),
+    selfRef = useRef(""),
+    playbackOperation = useRef<{
+      id: string;
+      type: string;
+      version: number;
+    } | null>(null);
+  latest.current = room;
+  selfRef.current = self;
+  const join = useCallback(
+    (roomCode?: string) => {
+      const s = socket.current;
+      if (!s?.connected) {
+        setError("Wait for the server connection.");
+        return;
+      }
+      if (!name.trim()) {
+        setError("Enter your display name.");
+        return;
+      }
+      setJoining(true);
+      setError("");
+      const target = roomCode?.trim().toUpperCase();
+      let identity;
+      try {
+        identity = target
+          ? JSON.parse(sessionStorage.getItem(`identity:${target}`) || "null")
+          : null;
+      } catch {}
+      s.timeout(5000).emit(
+        "join",
+        {
+          name: name.trim(),
+          mode: entryMode,
+          ...(target ? { code: target } : {}),
+          ...(identity ? { identity } : {}),
+        },
+        (timeout: Error | null, result: Result) => {
+          setJoining(false);
+          if (timeout || !result?.ok) {
+            setError(
+              timeout
+                ? "Server did not respond. Try again."
+                : result.error || "Unable to join.",
+            );
+            return;
+          }
+          const r = result.room!;
+          setSelf(result.identity!.id);
+          sessionStorage.setItem("name", name.trim());
+          sessionStorage.setItem(
+            `identity:${r.code}`,
+            JSON.stringify(result.identity),
+          );
+          resume.current = { code: r.code, name: name.trim() };
+          setRoom(r);
+          setCode(r.code);
+          history.replaceState(null, "", `?room=${r.code}`);
+        },
+      );
+    },
+    [name, entryMode],
+  );
+  useEffect(() => {
+    fetch("/api/catalog")
+      .then((r) => r.json())
+      .then(setCatalog)
+      .catch(() => setError("Catalog unavailable. Check the server."));
+    const s = io({
+      reconnection: true,
+      reconnectionDelay: 500,
+      reconnectionDelayMax: 2000,
+    });
+    socket.current = s;
+    let pingCount = 0;
+    const samples: { rtt: number; offset: number }[] = [];
+    const ping = () => {
+      if (!s.connected) return;
+      const start = monotonic();
+      s.timeout(3000).emit(
+        "clock",
+        {},
+        (err: Error | null, v: { serverTime: number }) => {
+          if (err || !v) return;
+          const end = monotonic(),
+            sample = {
+              rtt: end - start,
+              offset: v.serverTime - (start + end) / 2,
+            };
+          samples.push(sample);
+          if (samples.length > 20) samples.shift();
+          const best = [...samples].sort((a, b) => a.rtt - b.rtt).slice(0, 5);
+          const estimate =
+            best.reduce((sum, x) => sum + x.offset, 0) / best.length;
+          offsetRef.current = estimate;
+          window.dispatchEvent(
+            new CustomEvent("watchparty:clock", {
+              detail: { offset: estimate, rtt: sample.rtt },
+            }),
+          );
+          setOffset(estimate);
+          setRtt(sample.rtt);
+        },
+      );
+    };
+    s.on("connect", () => {
+      setStatus("Connected");
+      ping();
+      const target = resume.current;
+      if (target) {
+        const identity = JSON.parse(
+          sessionStorage.getItem(`identity:${target.code}`) || "null",
+        );
+        s.timeout(5000).emit(
+          "join",
+          { ...target, identity },
+          (err: Error | null, result: Result) => {
+            if (err || !result?.ok) {
+              setError(result?.error || "Reconnect failed. Reload to rejoin.");
+              setStatus("Resume failed");
+              return;
+            }
+            setRoom((previous) => accept(previous, result.room!));
+            setSelf(result.identity!.id);
+            syncRef.current();
+          },
+        );
+      }
+    });
+    s.on("disconnect", () => setStatus("Reconnecting"));
+    s.on("connect_error", () => setStatus("Reconnecting"));
+    s.on("state", (r: Room) => {
+      if (
+        r.lastOperation &&
+        ["play", "pause", "seek"].includes(r.lastOperation.type) &&
+        r.version > (playbackOperation.current?.version ?? -1)
+      )
+        playbackOperation.current = { ...r.lastOperation, version: r.version };
+      window.dispatchEvent(
+        new CustomEvent("watchparty:state", {
+          detail: { room: r, time: performance.now() },
+        }),
+      );
+      setRoom((previous) => accept(previous, r));
+    });
+    s.on("reaction", (reaction) => {
+      setReactions((old) => [...old.slice(-5), reaction]);
+      setTimeout(
+        () => setReactions((old) => old.filter((x) => x.id !== reaction.id)),
+        3000,
+      );
+    });
+    const timer = setInterval(() => {
+      pingCount++;
+      if (pingCount < 10 || pingCount % 5 === 0) ping();
+    }, 1000);
+    return () => {
+      clearInterval(timer);
+      s.disconnect();
+    };
+  }, []);
+  const command = useCallback(
+    (c: Record<string, unknown>) => {
+      const s = socket.current,
+        r = latest.current;
+      if (!s?.connected || !r || status !== "Connected") {
+        setError("Reconnect before sending commands.");
+        return;
+      }
+      const envelope = {
+        opId: crypto.randomUUID(),
+        mediaRevision: r.mediaRevision,
+        command: c,
+      };
+      window.dispatchEvent(
+        new CustomEvent("watchparty:command", {
+          detail: { ...envelope, time: performance.now() },
+        }),
+      );
+      s.timeout(4000).emit(
+        "command",
+        envelope,
+        (err: Error | null, result: Result) => {
+          if (err && !s.connected) {
+            setError(
+              "Connection lost before confirmation. Sync after reconnecting.",
+            );
+          } else if (err) {
+            setError("Command timed out. Retrying the same operation once.");
+            s.timeout(4000).emit(
+              "command",
+              envelope,
+              (again: Error | null, retry: Result) => {
+                if (again || !retry?.ok)
+                  setError(
+                    retry?.error ||
+                      "Command could not be confirmed. Sync before trying again.",
+                  );
+                else setError("");
+              },
+            );
+          } else if (!result?.ok)
+            setError(result?.error || "Command rejected.");
+        },
+      );
+    },
+    [status],
+  );
+  const canControl =
+      !!room &&
+      (room.hostId === self || room.settings.collaborative) &&
+      status === "Connected",
+    host = room?.hostId === self;
+  const synchronize = useCallback(() => {
+    const r = latest.current,
+      v = video.current;
+    if (
+      !r ||
+      !v ||
+      loadedRevision.current !== r.mediaRevision ||
+      v.readyState < 2 ||
+      !v.seekable.length
+    )
+      return;
+    const expected = expectedPosition(r, monotonic() + offsetRef.current),
+      delta = expected - v.currentTime;
+    setDrift(delta);
+    setPosition(v.currentTime);
+    const fix = correction(delta, r.playing);
+    if (v.supportsRate === false) {
+      fix.rate = 1;
+      fix.seek = Math.abs(delta) > (r.playing ? 0.4 : 0.15);
+    }
+    if (fix.seek) {
+      try {
+        v.currentTime = Math.min(expected, v.duration || expected);
+      } catch {}
+    }
+    v.playbackRate = fix.rate;
+    if (r.playing && v.paused) {
+      v.play()
+        .then(() => setBlocked(false))
+        .catch(() => setBlocked(true));
+    }
+    if (!r.playing && !v.paused) v.pause();
+    if (
+      r.version >= (playbackOperation.current?.version ?? -1) &&
+      !v.seeking &&
+      v.paused === !r.playing &&
+      Math.abs(expected - v.currentTime) <= 0.5
+    ) {
+      window.dispatchEvent(
+        new CustomEvent("watchparty:applied", {
+          detail: {
+            opId: playbackOperation.current?.id,
+            command: { type: playbackOperation.current?.type },
+            room: r,
+            time: performance.now(),
+            drift: expected - v.currentTime,
+            readyState: v.readyState,
+            paused: v.paused,
+          },
+        }),
+      );
+    }
+  }, []);
+  syncRef.current = synchronize;
+  useEffect(() => {
+    if (!room) return;
+    if (room.media.kind === "external") {
+      setPosition(expectedPosition(room, monotonic() + offsetRef.current));
+      return;
+    }
+    synchronize();
+    const interval = setInterval(synchronize, 100);
+    return () => clearInterval(interval);
+  }, [room?.version, synchronize]);
+  useEffect(() => {
+    if (!room) return;
+    loadedRevision.current = -1;
+    setVideoError("Loading source…");
+    setBlocked(false);
+    if (room.media.kind === "external") {
+      setVideoError("");
+      return;
+    }
+    video.current?.load();
+  }, [room?.mediaRevision, room?.media.url]);
+  useEffect(() => {
+    if (!room) return;
+    const timer = setInterval(
+      () =>
+        command({
+          type: "diagnostics",
+          drift:
+            expectedPosition(latest.current!, monotonic() + offsetRef.current) -
+            (video.current?.currentTime || 0),
+        }),
+      5000,
+    );
+    return () => clearInterval(timer);
+  }, [!!room, command]);
+  useEffect(() => {
+    const visibility = () => synchronize();
+    document.addEventListener("visibilitychange", visibility);
+    const key = (e: KeyboardEvent) => {
+      if (
+        !latest.current ||
+        (e.target instanceof HTMLElement &&
+          (/INPUT|TEXTAREA|SELECT|BUTTON/.test(e.target.tagName) ||
+            e.target.isContentEditable))
+      )
+        return;
+      if (e.key.toLowerCase() === "c") setCinema((v) => !v);
+      if (e.key.toLowerCase() === "s") synchronize();
+      if (e.code === "Space") {
+        e.preventDefault();
+        if (canControl)
+          command({ type: latest.current.playing ? "pause" : "play" });
+      }
+      if (["ArrowLeft", "ArrowRight"].includes(e.key) && canControl) {
+        e.preventDefault();
+        command({
+          type: "seek",
+          position: Math.max(
+            0,
+            expectedPosition(latest.current, monotonic() + offsetRef.current) +
+              (e.key === "ArrowRight" ? 10 : -10),
+          ),
+        });
+      }
+    };
+    window.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("visibilitychange", visibility);
+      window.removeEventListener("keydown", key);
+    };
+  }, [canControl, command, synchronize]);
+  const preferences = room?.participants.flatMap((p) => p.preferences) || [];
+  const scored = catalog
+    .filter((m) => room?.settings.mode !== "listen" || m.kind === "audio")
+    .map((m) => {
+      const matches = preferences.filter(
+        (p) => m.genres.includes(p) || m.tags.includes(p),
+      );
+      return {
+        ...m,
+        score: matches.length,
+        why: [...new Set(matches)].join(", "),
+      };
+    });
+  const searched = query
+    ? new Fuse(scored, { keys: ["title", "genres", "tags"], threshold: 0.38 })
+        .search(query)
+        .map((x) => x.item)
+    : scored;
+  const movies = searched
+    .filter(
+      (m) =>
+        (filter === "All" ||
+          m.genres.includes(filter) ||
+          m.tags.includes(filter)) &&
+        (!playable || !!m.url),
+    )
+    .sort((a, b) => b.score - a.score);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(
+        `${location.origin}/?room=${room!.code}`,
+      );
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError(
+        "Clipboard unavailable. Copy the invite URL from your address bar.",
+      );
+    }
+  };
+  if (!room)
+    return (
+      <div className="landing">
+        <header className="site-header">
+          <a className="brand" href="/">
+            ◉{" "}
+            <span>
+              F<span className="accent">oyer</span>
+            </span>
+          </a>
+          <span className="pill">YOUR PEOPLE. YOUR FOYER.</span>
+        </header>
+        <main className="welcome">
+          <div className="hero-copy">
+            <div className="eyebrow">GOOD STORIES. BETTER COMPANY.</div>
+            <h1>
+              Different places.
+              <br />
+              Same <em>moment.</em>
+            </h1>
+            <p>
+              Bring your people, press play, and make a night of it. A private
+              cinema with perfectly shared moments.
+            </p>
+            <div className="hero-tags">
+              <span>↔ Synchronized playback</span>
+              <span>✦ Shared discovery</span>
+              <span>♡ Live reactions</span>
+            </div>
+            <div className="poster-scene">
+              <div className="scene-orbit"></div>
+              <span className="scene-caption">
+                NOW SHOWING
+                <br />
+                <strong>A place to press play together.</strong>
+              </span>
+              <span className="scene-badge">WATCH · LISTEN · BELONG</span>
+            </div>
+          </div>
+          <section className="entry-card">
+            <div className="eyebrow">THE BEST SEAT IS NEXT TO FRIENDS</div>
+            <h2>Welcome to Foyer.</h2>
+            <div className="mode-switch" aria-label="Choose room type">
+              {(["watch", "listen"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  className={entryMode === mode ? "active" : ""}
+                  onClick={() => setEntryMode(mode)}
+                >
+                  {mode === "watch" ? "◉ Watch" : "♪ Listen"}
+                </button>
+              ))}
+            </div>
+            <p>No account. Just a name and your people.</p>
+            <label htmlFor="display-name">Display name</label>
+            <input
+              id="display-name"
+              placeholder="What should we call you?"
+              maxLength={32}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <button
+              className="primary full"
+              disabled={joining || status !== "Connected"}
+              onClick={() => join()}
+            >
+              ＋ Create a room
+            </button>
+            <div className="divider">or join the party</div>
+            <label htmlFor="room-code">Room code</label>
+            <input
+              id="room-code"
+              value={code}
+              placeholder="Six-character code"
+              maxLength={6}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") join(code);
+              }}
+            />
+            <button
+              className="secondary full"
+              disabled={joining || status !== "Connected" || code.length !== 6}
+              onClick={() => join(code)}
+            >
+              {joining ? "Opening your cinema…" : "Join room →"}
+            </button>
+            {error && (
+              <p role="alert" className="error">
+                {error}
+              </p>
+            )}
+            {error.includes("identity") && (
+              <button
+                onClick={() => {
+                  sessionStorage.removeItem(`identity:${code}`);
+                  setError("Identity cleared. Join again.");
+                }}
+              >
+                Clear expired identity
+              </button>
+            )}
+            <small className="connection">
+              <i className={status === "Connected" ? "online" : ""} />
+              {status} · Private by invitation
+            </small>
+          </section>
+        </main>
+        <footer>
+          Built for shared moments, wherever you are.{" "}
+          <span>Video, music and your people · Local demo included</span>
+        </footer>
+      </div>
+    );
+  return (
+    <div className={`app ${cinema ? "cinema" : ""}`}>
+      <header className="site-header">
+        <a className="brand" href="/">
+          ◉{" "}
+          <span>
+            F<span className="accent">oyer</span>
+          </span>
+        </a>
+        <div className="mode-switch room-mode" aria-label="Room mode">
+          {(["watch", "listen"] as const).map((mode) => (
+            <button
+              key={mode}
+              className={
+                (room.settings.mode || "watch") === mode ? "active" : ""
+              }
+              disabled={!host || status !== "Connected"}
+              onClick={() => command({ type: "mode", mode })}
+            >
+              {mode === "watch" ? "◉ Watch" : "♪ Listen"}
+            </button>
+          ))}
+        </div>
+        <div className="room-label">
+          <span className="live-dot" /> ROOM <strong>{room.code}</strong>
+          <button className="small" onClick={copy}>
+            {copied ? "Copied!" : "↗ Invite friends"}
+          </button>
+        </div>
+        <span className="connection">
+          <i className={status === "Connected" ? "online" : ""} />
+          {status}
+        </span>
+      </header>
+      {error && (
+        <div className="alert" role="alert">
+          {error}
+          {status === "Resume failed" && (
+            <button
+              onClick={() => {
+                sessionStorage.removeItem(`identity:${room.code}`);
+                location.href = "/";
+              }}
+            >
+              Return home and rejoin
+            </button>
+          )}
+          <button aria-label="Dismiss error" onClick={() => setError("")}>
+            ×
+          </button>
+        </div>
+      )}
+      <main className="room-layout">
+        <section className="stage">
+          <div className="section-heading">
+            <div>
+              <div className="eyebrow">THE SCREEN IS YOURS</div>
+              <h1>{room.media.title}</h1>
+            </div>
+            <button className="secondary" onClick={() => setCinema((v) => !v)}>
+              {cinema ? "Exit cinema" : "▣ Cinema mode"}
+            </button>
+          </div>
+          <div className="player">
+            <Suspense fallback={<div className="provider-loading" role="status">Loading room player…</div>}>
+              <FoyerPlayer
+                ref={video}
+                media={room.media}
+                revision={room.mediaRevision}
+                muted={muted}
+                onReady={() => {
+                  loadedRevision.current = room.mediaRevision;
+                  setVideoError("");
+                  const duration = video.current?.duration;
+                  if (
+                    host &&
+                    duration &&
+                    Number.isFinite(duration) &&
+                    Math.abs(duration - room.media.duration) > 0.5
+                  )
+                    command({ type: "duration", duration });
+                  synchronize();
+                }}
+                onPlaying={() => {
+                  setVideoError("");
+                  synchronize();
+                }}
+                onSeeked={() => synchronize()}
+                onError={(message) => {
+                  if (message.toLowerCase().includes("autoplay"))
+                    setBlocked(true);
+                  else setVideoError(message);
+                }}
+                onWaiting={() =>
+                  setVideoError("Buffering… playback will catch up when ready.")
+                }
+                onEnded={() => {
+                  if (host) command({ type: "ended" });
+                }}
+              />
+            </Suspense>
+            <div className="player-top">
+              <span className="pill">
+                {room.playing ? "● PLAYING TOGETHER" : "Ⅱ PAUSED"}
+              </span>
+              <span className="pill">
+                {room.media.kind === "external"
+                  ? "Companion required"
+                  : Math.abs(drift) <= 0.5
+                    ? "In sync"
+                    : "Catching up"}
+              </span>
+            </div>
+            {blocked && (
+              <button
+                className="autoplay primary"
+                onClick={() => {
+                  video.current
+                    ?.play()
+                    .then(() => {
+                      setBlocked(false);
+                      synchronize();
+                    })
+                    .catch(() =>
+                      setVideoError(
+                        "Playback blocked. Interact with this page and try again.",
+                      ),
+                    );
+                }}
+              >
+                Click to sync and play
+              </button>
+            )}
+            {videoError && (
+              <div className="video-message" role="status">
+                {videoError}
+                <button
+                  onClick={() => {
+                    video.current?.load();
+                    setVideoError("Retrying source…");
+                  }}
+                >
+                  Retry source
+                </button>
+                {host && (
+                  <button
+                    onClick={() =>
+                      command({ type: "media", movieId: "local-demo" })
+                    }
+                  >
+                    Use local demo
+                  </button>
+                )}
+              </div>
+            )}
+            <div className="floating-reactions" aria-live="polite">
+              {reactions.map((r) => (
+                <span key={r.id} title={r.name}>
+                  {r.emoji}
+                </span>
+              ))}
+            </div>
+          </div>
+          {room.media.provider === "youtube" && room.media.url && (
+            <p className="provider-attribution">
+              YouTube · Provided by YouTube ·{" "}
+              <a href={room.media.url} target="_blank" rel="noreferrer">
+                Open original video ↗
+              </a>
+            </p>
+          )}
+          <div className="transport">
+            <button
+              aria-label={room.playing ? "Pause" : "Play"}
+              disabled={!canControl}
+              onClick={() => command({ type: room.playing ? "pause" : "play" })}
+            >
+              {room.playing ? "Ⅱ" : "▶"}
+            </button>
+            <span>{time(position)}</span>
+            <input
+              aria-label="Seek playback"
+              type="range"
+              min="0"
+              max={room.media.duration}
+              step="0.1"
+              value={Math.min(position, room.media.duration)}
+              disabled={!canControl}
+              onChange={(e) => {
+                setPosition(Number(e.target.value));
+                command({ type: "seek", position: Number(e.target.value) });
+              }}
+            />
+            <span>{time(room.media.duration)}</span>
+            <button
+              aria-label="Toggle sound"
+              disabled={room.media.kind === "external"}
+              onClick={() => {
+                if (video.current) {
+                  video.current.muted = !video.current.muted;
+                  setMuted(video.current.muted);
+                }
+              }}
+            >
+              {muted ? "🔇" : "🔊"}
+            </button>
+            <button
+              className="small"
+              onClick={synchronize}
+              disabled={room.media.kind === "external"}
+            >
+              ↔ Sync me now
+            </button>
+          </div>
+          <div className="under-player">
+            <span>
+              {host
+                ? "You’re hosting"
+                : `Hosted by ${room.participants.find((p) => p.id === room.hostId)?.name || "a reconnecting friend"}`}{" "}
+              ·{" "}
+              {room.settings.collaborative
+                ? "Everyone can control"
+                : "Host controls playback"}
+            </span>
+            <div className="reaction-bar">
+              {["❤️", "🔥", "😂", "👏", "😮", "🎉"].map((emoji) => (
+                <button
+                  key={emoji}
+                  aria-label={`React ${emoji}`}
+                  disabled={status !== "Connected"}
+                  onClick={() => command({ type: "reaction", emoji })}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="tools-row">
+            <button
+              className="text-button"
+              onClick={() => setDiagnostics((v) => !v)}
+            >
+              {diagnostics ? "Hide" : "Show"} sync diagnostics
+            </button>
+            <span>
+              Shortcuts: Space play/pause · ← → seek · S sync · C cinema
+            </span>
+          </div>
+          {diagnostics && (
+            <div className="diagnostic">
+              <span>
+                RTT <b>{rtt.toFixed(1)} ms</b>
+              </span>
+              <span>
+                Estimated drift <b>{(drift * 1000).toFixed(0)} ms</b>
+              </span>
+              <span>
+                Clock offset <b>{offset.toFixed(1)} ms</b>
+              </span>
+              <span>
+                {status} · state v{room.version}
+              </span>
+              <small>
+                Clock estimate uses the five fastest recent round trips. Drift
+                is sampled before correction; buffering and autoplay can delay
+                application.
+              </small>
+            </div>
+          )}
+          {!cinema && (
+            <>
+              {room.settings.mode === "listen" && (
+                <Suspense fallback={<div className="panel" role="status">Loading music discovery…</div>}>
+                  <MusicDiscovery
+                    command={command}
+                    canControl={canControl}
+                    connected={status === "Connected"}
+                  />
+                </Suspense>
+              )}
+              <section className="discovery panel">
+                <div className="section-heading">
+                  <div>
+                    <div className="eyebrow">
+                      FIND YOUR NEXT SHARED OBSESSION
+                    </div>
+                    <h2>
+                      {room.settings.mode === "listen"
+                        ? "Your local listening library."
+                        : "Something for everyone."}
+                    </h2>
+                  </div>
+                  <span className="pill">{catalog.length} SAMPLE TITLES</span>
+                </div>
+                <div className="search-row">
+                  <input
+                    aria-label="Search movies"
+                    placeholder="⌕ Search titles, genres or moods…"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                  <select
+                    aria-label="Filter genre"
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value)}
+                  >
+                    {["All", ...genres, ...moods].map((g) => (
+                      <option key={g}>{g}</option>
+                    ))}
+                  </select>
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={playable}
+                      onChange={(e) => setPlayable(e.target.checked)}
+                    />
+                    Playable only
+                  </label>
+                </div>
+                <p className="muted">
+                  Recommendations count matching preferences across your group.
+                  Sample concepts are discovery metadata; only cards marked
+                  playable have video.
+                </p>
+                <div className="movie-grid">
+                  {movies.slice(0, 12).map((m, i) => (
+                    <article className="movie" key={m.id}>
+                      <div
+                        className="movie-art"
+                        style={
+                          { "--movie-color": m.color } as React.CSSProperties
+                        }
+                      >
+                        <span className="movie-number">
+                          {String(i + 1).padStart(2, "0")}
+                        </span>
+                        <span>
+                          {m.url
+                            ? m.kind === "audio"
+                              ? "♪ LOCAL AUDIO"
+                              : "▶ LOCAL & PLAYABLE"
+                            : "DISCOVERY SAMPLE"}
+                        </span>
+                        <strong>{m.title}</strong>
+                      </div>
+                      <h3>{m.title}</h3>
+                      <small>
+                        {m.genres.join(" · ")} · {Math.round(m.duration / 60)}{" "}
+                        min
+                      </small>
+                      <p>{m.description}</p>
+                      {m.score > 0 && (
+                        <p className="match">
+                          ✦ {m.score} preference matches: {m.why}
+                        </p>
+                      )}
+                      <div className="card-actions">
+                        <button
+                          disabled={status !== "Connected"}
+                          onClick={() =>
+                            command({ type: "enqueue", movieId: m.id })
+                          }
+                        >
+                          ＋ Queue
+                        </button>
+                        {m.url && (
+                          <button
+                            disabled={!canControl}
+                            onClick={() =>
+                              command({ type: "media", movieId: m.id })
+                            }
+                          >
+                            Watch
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                {!movies.length && (
+                  <div className="empty">
+                    No matches. Try another title, genre or mood.
+                  </div>
+                )}
+                {movies.length > 12 && (
+                  <p className="muted">
+                    Showing the top 12 matches. Narrow your search to find more.
+                  </p>
+                )}
+              </section>
+              <section className="panel source-panel">
+                <h3>Add a link to the room</h3>
+                <p className="muted">
+                  Paste YouTube, Vimeo, SoundCloud, direct audio/video or
+                  on-demand HLS. Subscription titles open in the companion
+                  extension. Players confirm duration when available.
+                </p>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const data = new FormData(
+                      e.currentTarget,
+                      (e.nativeEvent as SubmitEvent).submitter,
+                    );
+                    command({
+                      type: "source",
+                      enqueue: data.get("action") === "queue",
+                      media: {
+                        title: String(data.get("title")),
+                        url: String(data.get("url")),
+                        duration: Number(data.get("duration")),
+                      },
+                    });
+                  }}
+                >
+                  <input
+                    name="title"
+                    aria-label="Custom media title"
+                    placeholder="Title"
+                    maxLength={100}
+                    required
+                  />
+                  <input
+                    name="url"
+                    aria-label="Custom media URL"
+                    type="url"
+                    placeholder="YouTube, SoundCloud or a direct media URL"
+                    required
+                  />
+                  <input
+                    name="duration"
+                    aria-label="Custom duration seconds"
+                    type="number"
+                    min="1"
+                    max="43200"
+                    defaultValue="600"
+                    required
+                  />
+                  <button name="action" value="play" disabled={!canControl}>
+                    {room.settings.mode === "listen" ? "Play audio" : "Load video"}
+                  </button>
+                  <button
+                    name="action"
+                    value="queue"
+                    disabled={status !== "Connected"}
+                  >
+                    Add to queue
+                  </button>
+                </form>
+              </section>
+            </>
+          )}
+        </section>
+        {!cinema && (
+          <aside className="sidebar">
+            <section className="panel participants">
+              <div className="section-heading">
+                <h2>The audience</h2>
+                <span className="count">{room.participants.length}</span>
+              </div>
+              {room.participants.map((p, i) => (
+                <div className="participant" key={p.id}>
+                  <div
+                    className="avatar"
+                    style={{
+                      background: ["#513b78", "#314e65", "#704c36", "#375b52"][
+                        i % 4
+                      ],
+                    }}
+                  >
+                    {p.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <strong>
+                      {p.name}
+                      {p.id === self ? " (you)" : ""}
+                    </strong>
+                    <small>
+                      {p.id === room.hostId ? "♛ Host · " : ""}
+                      {p.connected
+                        ? p.drift === undefined
+                          ? "Connected"
+                          : Math.abs(p.drift) <= 0.5
+                            ? "In sync"
+                            : "Catching up"
+                        : "Reconnecting…"}
+                    </small>
+                  </div>
+                  {host && p.id !== self && (
+                    <button
+                      className="small"
+                      aria-label={`Transfer host to ${p.name}`}
+                      disabled={!p.connected || status !== "Connected"}
+                      onClick={() =>
+                        command({ type: "transfer", participantId: p.id })
+                      }
+                    >
+                      Make host
+                    </button>
+                  )}
+                </div>
+              ))}
+              <details>
+                <summary>Your movie preferences</summary>
+                <div className="preference-tags">
+                  {[...genres, ...moods].map((g) => {
+                    const values =
+                      room.participants.find((p) => p.id === self)
+                        ?.preferences || [];
+                    return (
+                      <button
+                        key={g}
+                        className={values.includes(g) ? "selected" : ""}
+                        disabled={status !== "Connected"}
+                        onClick={() =>
+                          command({
+                            type: "preferences",
+                            values: values.includes(g)
+                              ? values.filter((v) => v !== g)
+                              : [...values, g].slice(-8),
+                          })
+                        }
+                      >
+                        {g}
+                      </button>
+                    );
+                  })}
+                </div>
+              </details>
+              {host && (
+                <details>
+                  <summary>Room settings</summary>
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={room.settings.collaborative}
+                      disabled={status !== "Connected"}
+                      onChange={(e) =>
+                        command({
+                          type: "settings",
+                          collaborative: e.target.checked,
+                          autoAdvance: room.settings.autoAdvance,
+                        })
+                      }
+                    />
+                    Everyone controls playback
+                  </label>
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={room.settings.autoAdvance}
+                      disabled={status !== "Connected"}
+                      onChange={(e) =>
+                        command({
+                          type: "settings",
+                          collaborative: room.settings.collaborative,
+                          autoAdvance: e.target.checked,
+                        })
+                      }
+                    />
+                    Auto-play winning queued video
+                  </label>
+                </details>
+              )}
+            </section>
+            <section className="panel social">
+              <nav className="tabs" aria-label="Room activity">
+                {["Chat", "Queue", "Polls", "Moments"].map((t) => (
+                  <button
+                    className={tab === t ? "active" : ""}
+                    key={t}
+                    onClick={() => setTab(t)}
+                  >
+                    {t}
+                    {t === "Queue" && room.queue.length
+                      ? ` ${room.queue.length}`
+                      : ""}
+                  </button>
+                ))}
+              </nav>
+              {tab === "Chat" && (
+                <ChatPanel
+                  room={room}
+                  command={command}
+                  disabled={status !== "Connected"}
+                />
+              )}
+              {tab === "Queue" && (
+                <div className="tab-content">
+                  <div className="section-heading">
+                    <h3>Watch next</h3>
+                    <button
+                      disabled={
+                        !canControl || !room.queue.some((q) => q.movie.url)
+                      }
+                      onClick={() => command({ type: "next" })}
+                    >
+                      Play winner
+                    </button>
+                  </div>
+                  <p className="muted">
+                    Vote together. The highest-voted playable item goes next;
+                    ties follow queue order.
+                  </p>
+                  {!room.queue.length && (
+                    <div className="empty">
+                      Your next feature awaits.
+                      <br />
+                      Add a title from discovery.
+                    </div>
+                  )}
+                  {room.queue.map((q) => (
+                    <div className="queue-item" key={q.id}>
+                      <strong>{q.movie.title}</strong>
+                      <small>
+                        {q.movie.url ? "Playable" : "Discovery only"}
+                      </small>
+                      <button
+                        disabled={status !== "Connected"}
+                        className={q.votes.includes(self) ? "selected" : ""}
+                        onClick={() =>
+                          command({ type: "queueVote", itemId: q.id })
+                        }
+                      >
+                        ↑ {q.votes.length} votes
+                      </button>
+                      {host && (
+                        <button
+                          disabled={status !== "Connected"}
+                          aria-label={`Remove ${q.movie.title}`}
+                          onClick={() =>
+                            command({ type: "remove", itemId: q.id })
+                          }
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {tab === "Polls" && (
+                <div className="tab-content">
+                  <h3>Let the group decide</h3>
+                  {room.polls.map((p) => (
+                    <div className="poll" key={p.id}>
+                      <strong>{p.question}</strong>
+                      {p.options.map((o, i) => (
+                        <button
+                          key={i}
+                          className={p.votes[self] === i ? "selected" : ""}
+                          disabled={status !== "Connected"}
+                          onClick={() =>
+                            command({ type: "vote", pollId: p.id, option: i })
+                          }
+                        >
+                          {o}
+                          <span>
+                            {
+                              Object.values(p.votes).filter((v) => v === i)
+                                .length
+                            }
+                          </span>
+                        </button>
+                      ))}
+                      <small>
+                        {Object.keys(p.votes).length} votes · one choice per
+                        participant
+                      </small>
+                    </div>
+                  ))}
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const data = new FormData(e.currentTarget);
+                      command({
+                        type: "poll",
+                        question: String(data.get("question")),
+                        options: String(data.get("options"))
+                          .split(",")
+                          .map((v) => v.trim())
+                          .filter(Boolean),
+                      });
+                      e.currentTarget.reset();
+                    }}
+                  >
+                    <label>
+                      New poll
+                      <input
+                        name="question"
+                        placeholder="What are we watching next?"
+                        required
+                        maxLength={140}
+                      />
+                    </label>
+                    <label>
+                      Options (2–5, comma separated)
+                      <input
+                        name="options"
+                        placeholder="Adventure, Comedy"
+                        required
+                        maxLength={300}
+                      />
+                    </label>
+                    <button
+                      className="primary"
+                      disabled={status !== "Connected"}
+                    >
+                      Create poll
+                    </button>
+                  </form>
+                </div>
+              )}
+              {tab === "Moments" && (
+                <div className="tab-content">
+                  <h3>Moments worth remembering</h3>
+                  {room.bookmarks.map((b) => (
+                    <button
+                      className="bookmark"
+                      key={b.id}
+                      disabled={!canControl}
+                      onClick={() =>
+                        command({ type: "seek", position: b.position })
+                      }
+                    >
+                      {time(b.position)} <strong>{b.name}</strong>
+                    </button>
+                  ))}
+                  {!room.bookmarks.length && (
+                    <p className="empty">Save a shared timestamp.</p>
+                  )}
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const data = new FormData(e.currentTarget);
+                      command({
+                        type: "bookmark",
+                        name: String(data.get("name")),
+                      });
+                      e.currentTarget.reset();
+                    }}
+                  >
+                    <input
+                      name="name"
+                      aria-label="Moment name"
+                      placeholder="Name this moment…"
+                      required
+                      maxLength={60}
+                    />
+                    <button disabled={status !== "Connected"}>
+                      ＋ Save at {time(position)}
+                    </button>
+                  </form>
+                </div>
+              )}
+            </section>
+          </aside>
+        )}
+      </main>
+      <footer>
+        Foyer · Together, from anywhere.<span>Local cinema · {room.code}</span>
+      </footer>
+    </div>
+  );
+}
+function ChatPanel({
+  room,
+  command,
+  disabled,
+}: {
+  room: Room;
+  command: (c: Record<string, unknown>) => void;
+  disabled: boolean;
+}) {
+  const [revealed, setRevealed] = useState<string[]>([]),
+    [text, setText] = useState(""),
+    [spoiler, setSpoiler] = useState(false);
+  const end = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: "nearest" });
+  }, [room.chat.length]);
+  return (
+    <>
+      <div className="chat-messages" aria-live="polite">
+        {!room.chat.length && (
+          <div className="empty">
+            The lights are down.
+            <br />
+            Start the conversation.
+          </div>
+        )}
+        {room.chat.map((m) => (
+          <div className="chat-message" key={m.id}>
+            <div>
+              <strong>{m.name}</strong>
+              <small>
+                {new Date(m.time).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </small>
+            </div>
+            {m.spoiler && !revealed.includes(m.id) ? (
+              <button
+                className="spoiler"
+                onClick={() => setRevealed((old) => [...old, m.id])}
+              >
+                ◈ Spoiler · click to reveal
+              </button>
+            ) : (
+              <p>{m.text}</p>
+            )}
+          </div>
+        ))}
+        <div ref={end} />
+      </div>
+      <form
+        className="chat-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!text.trim()) return;
+          command({ type: "chat", text, spoiler });
+          setText("");
+        }}
+      >
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={spoiler}
+            onChange={(e) => setSpoiler(e.target.checked)}
+          />
+          Mark as spoiler
+        </label>
+        <div>
+          <input
+            aria-label="Chat message"
+            placeholder="Share a thought…"
+            maxLength={500}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+          <button
+            className="primary"
+            aria-label="Send message"
+            disabled={disabled || !text.trim()}
+          >
+            ↑
+          </button>
+        </div>
+      </form>
+    </>
+  );
+}
+createRoot(document.getElementById("root")!).render(<App />);

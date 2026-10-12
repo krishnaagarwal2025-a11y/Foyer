@@ -147,3 +147,13 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Foyer runtime and generated artifacts
+data/
+test-results/
+playwright-report/
+public/extension/*.js
+public/extension/*.zip
+public/extension/manifest.json
+public/extension/popup.html
+extension-test-profile/

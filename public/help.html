@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#101018" />
+    <title>Foyer · Help & support</title>
+    <link rel="icon" href="/foyer.svg" />
+    <style>
+      body{max-width:850px;margin:40px auto;padding:0 24px;background:#101018;color:#eee;font:16px system-ui;line-height:1.7}a{color:#c3a0ff}h1,h2{color:#d3b5ff}section{border:1px solid #41334f;border-radius:14px;padding:24px;margin:24px 0}code{background:#292132;padding:4px;border-radius:5px}li{margin:10px 0}:focus-visible{outline:2px solid #caa9ff;outline-offset:3px}
+    </style>
+  </head>
+  <body>
+    <a href="/">← Back to Foyer</a>
+    <h1>Your people. Your Foyer.</h1>
+    <p>Shared rooms for video, music and conversation. Everyone gets their own synchronized player.</p>
+    <section>
+      <h2>Watch & Listen</h2>
+      <p>Choose a room type before creating a room. The host can switch modes; that loads the matching local demo and clears bookmarks for the previous media. Listen rooms accept audio sources. Add YouTube, Vimeo, SoundCloud, or direct audio/video/on-demand HLS from the room discovery section.</p>
+      <p>YouTube uses its official visible player, with its own controls and advertising. Foyer does not extract audio, hide ads, or grant access to private videos. Actual source availability depends on the provider. Live HLS is not synchronized.</p>
+      <p>Audius offers artist-published music, not every commercial recording. Navidrome is open-source personal-library software: the operator supplies the music collection; Navidrome does not include a commercial song catalog. Foyer keeps Navidrome credentials on the server and protects shared searches with a separate library code.</p>
+    </section>
+    <section id="extension">
+      <h2>Foyer Companion · experimental</h2>
+      <ol>
+        <li><a href="/extension/foyer-extension.zip" download>Download the companion ZIP</a> and extract it to a folder.</li>
+        <li>In Chrome or Edge open <code>chrome://extensions</code> or <code>edge://extensions</code>, enable <b>Developer mode</b>, choose <b>Load unpacked</b>, and select the extracted folder.</li>
+        <li>On an authorized Netflix watch page, Prime Video title page or Hotstar/JioHotstar title, open the extension popup, enter the Foyer server origin, then select <b>Allow server + this site</b>. The extension uses the named provider sites and requests access only to your chosen Foyer server. Use HTTPS for a public deployment.</li>
+        <li>Reload the title page and open the <b>Foyer</b> panel. Enter your name and create a room or join by its six-character code.</li>
+        <li>The host can bind the current title, copy an invite, transfer host, chat, react and control playback. Each viewer opens the same title in their own signed-in tab and joins with the extension.</li>
+        <li>If automatic title recognition fails, use <b>Use this title</b>. Ads are not skipped or modified. The host can mark an ad as playing; playback pauses and may resume after the ad.</li>
+      </ol>
+      <p>Page changes, closed players, regional editions, ads and service restrictions can prevent control. Signed-in Netflix/Prime/Hotstar playback has not been verified by the fixture suite. The extension reads the title page URL, document title and accessible video state. It never reads login forms, cookies, passwords, protected media URLs or DRM keys. It does not send a stream through Foyer. The included ZIP is for developer installation and has not been published in the Chrome Web Store.</p>
+    </section>
+    <section>
+      <h2>Playback & connection help</h2>
+      <ul>
+        <li>If autoplay is blocked, select <b>Click to sync and play</b> or start playback in the provider player, then sync.</li>
+        <li>Offline commands pause until reconnect. Return within the 15-second grace period to keep your identity; otherwise rejoin as a new participant. An absent host is replaced deterministically.</li>
+        <li>Host controls are the default. Guests can chat, react, queue, vote and bookmark. Host transfer or collaborative controls grant room control.</li>
+        <li>External services need internet and may restrict playback. The local video and music demo work offline.</li>
+        <li>Room codes are invitations. Chat is bounded; spoilers are hidden until revealed, not encrypted.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>Privacy & project support</h2>
+      <p>Foyer has no registration, analytics or ad trackers of its own. Anonymous room identities and bounded room activity are held by the server. Embedded providers receive their normal playback requests and apply their own policies. Empty rooms are removed after reconnect grace expires.</p>
+      <p>Source, setup, verification limits, and issue reporting: <a href="https://github.com/krishnaagarwal2025-a11y/Foyer">GitHub · Foyer</a>.</p>
+    </section>
+  </body>
+</html>

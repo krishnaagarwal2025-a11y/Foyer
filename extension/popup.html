@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Foyer Companion</title>
+    <style>
+      body {
+        width: 310px;
+        padding: 16px;
+        background: #171320;
+        color: #eee;
+        font: 14px system-ui;
+      }
+      h1 {
+        color: #c8a6ff;
+        margin: 0;
+      }
+      p {
+        line-height: 1.5;
+        color: #b9a7cc;
+      }
+      input,
+      button {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #765590;
+        border-radius: 8px;
+        background: #292033;
+        color: #eee;
+        margin: 10px 0;
+      }
+      button {
+        background: #c19af9;
+        color: #21132e;
+        cursor: pointer;
+        font-weight: 700;
+      }
+      :focus-visible {
+        outline: 2px solid #e3caff;
+        outline-offset: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Foyer</h1>
+    <p>
+      Allow the Foyer server and current supported streaming site, then reload
+      that title page to show the companion panel.
+    </p>
+    <label for="server">Foyer server origin</label
+    ><input id="server" type="url" value="http://localhost:3001" /><button
+      id="save"
+    >
+      Allow server + this site</button
+    ><button id="toggle">Show / hide companion</button>
+    <p id="status" role="status"></p>
+    <script src="popup.js"></script>
+  </body>
+</html>

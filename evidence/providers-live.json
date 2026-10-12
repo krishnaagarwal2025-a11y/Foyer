@@ -1,0 +1,17 @@
+{
+  "startedAt": "2026-10-12T07:25:04.812Z",
+  "provider": "Audius",
+  "endpoint": "https://api.audius.co/v1",
+  "keyRequired": false,
+  "search": {
+    "status": 200,
+    "playableMatches": 11
+  },
+  "stream": {
+    "status": 200,
+    "contentType": "audio/mpeg"
+  },
+  "limitations": "Network smoke test only. API availability varies. This catalog contains artist-published tracks, not every commercial recording.",
+  "passed": true,
+  "completedAt": "2026-10-12T07:25:08.698Z"
+}
