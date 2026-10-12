@@ -228,6 +228,13 @@ export async function createApplication({ cloud = false } = {}) {
       tail = task;
       void task.finally(() => tasks.delete(task)).catch(() => {});
     };
+    const allowControl = () => {
+      if (Date.now() - windowAt > 1000) {
+        windowAt = Date.now();
+        controls = 0;
+      }
+      return ++controls <= 20;
+    };
     socket.on("clock", (_data, ack) => {
       if (typeof ack === "function") ack({ serverTime: engine.now() });
     });
@@ -256,11 +263,7 @@ export async function createApplication({ cloud = false } = {}) {
       });
     });
     socket.on("command", (data, ack) => {
-      if (Date.now() - windowAt > 1000) {
-        windowAt = Date.now();
-        controls = 0;
-      }
-      if (++controls > 20) {
+      if (!allowControl()) {
         if (typeof ack === "function")
           ack({ ok: false, error: "Too many commands. Please slow down." });
         return;
@@ -277,6 +280,36 @@ export async function createApplication({ cloud = false } = {}) {
               ok: false,
               error: "Room transaction unavailable. Sync and retry.",
             });
+        }
+      });
+    });
+    socket.on("sync", (data, ack) => {
+      if (typeof ack !== "function") return;
+      if (!allowControl()) {
+        ack({ ok: false, error: "Too many requests. Please slow down." });
+        return;
+      }
+      if (
+        !data ||
+        typeof data !== "object" ||
+        Array.isArray(data) ||
+        Object.keys(data).length
+      ) {
+        ack({ ok: false, error: "Invalid sync request." });
+        return;
+      }
+      enqueue(async () => {
+        try {
+          ack(
+            coordinator
+              ? await coordinator.sync(socket.id)
+              : engine.sync(socket.id),
+          );
+        } catch {
+          ack({
+            ok: false,
+            error: "Room storage unavailable. Try syncing again.",
+          });
         }
       });
     });

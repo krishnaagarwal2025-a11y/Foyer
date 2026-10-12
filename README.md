@@ -119,3 +119,9 @@ Discovery now sits in the right sidebar, while **Add a link to the room** is dir
 
 
 Cloud deployment externalizes authority to Redis: per-room fenced transactions preserve versions and deduplication across function instances, and Pub/Sub delivers committed snapshots. See [DEPLOYMENT.md](DEPLOYMENT.md) for retention, presence leases and deployment limits.
+
+## Clearer room layout and manual sync
+
+The default **Room** sidebar keeps Chat, Queue, Polls and Moments beside the player. **Discover** holds film/music search; **People** holds participants, preferences, host transfer and settings. Open **Add a link** under the player to enter a source. Discovery starts with playable entries; uncheck **Playable only** to search sample metadata too. Each view retains its state while hidden.
+
+**Sync me now** and the **S** shortcut affect only your local player. They request an authenticated current snapshot, reset playback rate and force timeline correction; a click also retries autoplay within the user gesture. Success is shown only after the room responds and the loaded player matches play/pause and is within 500 ms. Pending loading, buffering, blocked autoplay, timeout and reconnection have explicit feedback. Sync is disabled offline and for external subscription-service screens; use the companion on the service page there. Automatic correction remains bounded and never sends room-control feedback. Keyboard shortcuts ignore typing, modifier combinations and repeated keys.

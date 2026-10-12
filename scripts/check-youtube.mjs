@@ -8,7 +8,7 @@ const report = {
   url: process.env.DEMO_URL || "http://127.0.0.1:3001",
   passed: false,
   limitations:
-    "Live external-service smoke test, one Chromium page on localhost. Video availability and autoplay are provider-dependent; not a synchronization benchmark.",
+    "Live external-service smoke test, one Chromium page at the recorded URL. Video availability and autoplay are provider-dependent; not a synchronization benchmark.",
 };
 const browser = await chromium.launch({
   args: ["--autoplay-policy=no-user-gesture-required"],
@@ -30,7 +30,15 @@ try {
   });
   await page.goto(report.url);
   await page.getByLabel("Display name").fill("YouTube live check");
+  await page.getByRole("button", { name: "＋ Create a room" }).waitFor();
+  await page.waitForFunction(() => {
+    const button = [...document.querySelectorAll("button")].find((button) =>
+      button.textContent.includes("Create a room"),
+    );
+    return button && !button.disabled;
+  });
   await page.getByRole("button", { name: "＋ Create a room" }).click();
+  await page.locator(".source-panel > summary").click();
   await page.getByLabel("Custom media title").fill("Official YouTube API demo");
   await page.getByLabel("Custom media URL").fill(report.source);
   await page.getByRole("button", { name: "Load video", exact: true }).click();
@@ -61,13 +69,25 @@ try {
     () => window.youtubeSamples.length,
   );
   report.positionSeconds = await page.getByLabel("Seek playback").inputValue();
-  report.playerBounds = await page.locator(".provider-frame iframe").boundingBox();
-  const embed = page.frames().find((frame) => frame.url().startsWith("https://www.youtube.com/embed/"));
-  if (embed) report.videoElement = await embed.locator("video").evaluate((video) => ({
-    currentTime: video.currentTime, paused: video.paused, readyState: video.readyState,
-    videoWidth: video.videoWidth, videoHeight: video.videoHeight,
-    renderedWidth: video.getBoundingClientRect().width, renderedHeight: video.getBoundingClientRect().height,
-  })).catch(() => ({ unavailable: true }));
+  report.playerBounds = await page
+    .locator(".provider-frame iframe")
+    .boundingBox();
+  const embed = page
+    .frames()
+    .find((frame) => frame.url().startsWith("https://www.youtube.com/embed/"));
+  if (embed)
+    report.videoElement = await embed
+      .locator("video")
+      .evaluate((video) => ({
+        currentTime: video.currentTime,
+        paused: video.paused,
+        readyState: video.readyState,
+        videoWidth: video.videoWidth,
+        videoHeight: video.videoHeight,
+        renderedWidth: video.getBoundingClientRect().width,
+        renderedHeight: video.getBoundingClientRect().height,
+      }))
+      .catch(() => ({ unavailable: true }));
   report.feedback = await page.locator(".video-message").allTextContents();
   report.autoplayAction = await page
     .getByRole("button", { name: "Click to sync and play" })
@@ -81,7 +101,10 @@ try {
   await browser.close();
   report.completedAt = new Date().toISOString();
   mkdirSync("evidence", { recursive: true });
-  writeFileSync("evidence/youtube-live.json", JSON.stringify(report, null, 2));
+  writeFileSync(
+    process.env.YOUTUBE_REPORT || "evidence/youtube-live.json",
+    JSON.stringify(report, null, 2),
+  );
   console.log(JSON.stringify(report, null, 2));
   if (!report.passed) process.exitCode = 1;
 }

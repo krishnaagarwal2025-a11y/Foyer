@@ -55,3 +55,11 @@ YouTube playback regression verification: `tests/browser/youtube.spec.ts` uses t
 - server/cloud.ts and server/redis-store.ts provide distributed serialization, committed Pub/Sub, leases and token-bound resumes. Nine additional cloud unit tests pass (44 total).
 - Real two-process Redis tests: evidence/cloud-check.json; public protocol tests: evidence/vercel-check.json (public instance placement is not observable).
 - Public browser suite: all four workflows pass. Deployment constraints and manual redeploy instructions are in DEPLOYMENT.md.
+
+## Sync and layout regression evidence
+
+- `src/main.tsx`: separate user-initiated sync and automatic correction, rate reset, bounded pending request, safe autoplay retry and local-only feedback. `src/room.css`: focused Room/Discover/People layout, collapsed source/help/details and responsive views.
+- `server/engine.ts` / `server/cloud.ts` / `server/app.ts`: fresh member-only `sync` snapshots, payload validation, shared request rate limit, cloud fencing and no play/pause/seek mutation. Restored SQLite checkpoints advance state version.
+- `tests/browser/sync.spec.ts`: modest paused drift, autoplay recovery via Sync me now, keyboard action, no guest command feedback, sidebar/mobile layout, dropped response and offline control disabling.
+- `tests/browser/youtube.spec.ts`: manual sync recovery through an asynchronous official-API-shaped fixture; this tests integration, not live provider availability.
+- `tests/engine.test.ts`, `tests/cloud.test.ts`: guest sync freshness, immutable public snapshots, token exclusion, stale-owner rejection and restart version ordering. 46 unit tests and six local browser workflows pass.

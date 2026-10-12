@@ -22,3 +22,7 @@ For measured evidence, run `npm run benchmark` (ten socket clients) and `npm run
 
 ## Public demo
 Open https://foyer-cyan.vercel.app on both devices and follow the same room walkthrough. Use the generated invite link. Local room codes do not exist in the separate cloud database. No Vercel login is required for the production URL.
+
+## Current room navigation
+
+Chat opens by default in **Room**. Use **Discover** for film/song search and **People** for preferences, host transfer and room settings. Expand **Add a link** beneath the player to paste media. The catalog starts at **Playable only**; uncheck it before the sample fuzzy-search demonstration. **Sync me now** visibly reports progress and success and retries blocked playback locally without granting guest control. To demonstrate a failed request, the browser regression test drops just the sync acknowledgement; the interface reports a timeout instead of success. Network disconnection is detected by heartbeat (up to about 15 seconds), then the separate 15-second grace period begins; closing a client normally is detected sooner.

@@ -123,16 +123,16 @@ test("YouTube buffering settles, native host actions synchronize, retry rebuilds
   try {
     const code = await enter(host, "YouTube host");
     await enter(guest, "YouTube guest", code);
+    await host.getByRole("button", { name: "Discover", exact: true }).click();
     await host.setViewportSize({ width: 714, height: 659 });
     const layout = await host.evaluate(() => ({
-      source: document
-        .querySelector(".stage .source-panel")
-        ?.getBoundingClientRect().x,
-      discovery: document
-        .querySelector(".sidebar .discovery")
-        ?.getBoundingClientRect().x,
+      playerBottom: document.querySelector(".player")!.getBoundingClientRect()
+        .bottom,
+      discoveryTop: document
+        .querySelector(".sidebar .discovery")!
+        .getBoundingClientRect().top,
     }));
-    expect(layout.discovery!).toBeGreaterThan(layout.source!);
+    expect(layout.discoveryTop).toBeGreaterThan(layout.playerBottom);
     expect(
       await host.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
@@ -143,6 +143,7 @@ test("YouTube buffering settles, native host actions synchronize, retry rebuilds
       fullPage: true,
     });
     await host.setViewportSize({ width: 1280, height: 720 });
+    await host.locator(".source-panel > summary").click();
     await host.getByLabel("Custom media title").fill("Song fixture");
     await host
       .getByLabel("Custom media URL")
@@ -237,8 +238,11 @@ test("YouTube buffering settles, native host actions synchronize, retry rebuilds
     await host.evaluate(() => {
       (window as any).youtubeFixture.blocked = false;
     });
-    await host.getByRole("button", { name: "Click to sync and play" }).click();
+    await host.getByRole("button", { name: "Sync me now" }).click();
     await expect.poll(async () => (await fixtureState(host)).state).toBe(1);
+    await expect(host.locator("#sync-feedback")).toContainText(
+      "Synced to the room",
+    );
     // A provider error leaves retry visible; retry must destroy/recreate the iframe.
     await host.evaluate(() =>
       (window as any).youtubeFixture.instances

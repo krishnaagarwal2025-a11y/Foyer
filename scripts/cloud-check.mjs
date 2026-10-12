@@ -60,6 +60,13 @@ try {
   );
   assert(first.ok && repeated.ok);
   assert.deepEqual(first, repeated);
+  const synced = await emit(b, "sync", {});
+  assert(synced.ok, synced.error);
+  assert.equal(synced.room.position, 30);
+  assert(synced.room.playing);
+  assert.equal((await emit(b, "sync", { code: "FORGED" })).ok, false);
+  const outsider = await connect(urls[1] || urls[0]);
+  assert.equal((await emit(outsider, "sync", {})).ok, false);
   a.disconnect();
   await new Promise((r) => setTimeout(r, 500));
   const resumed = await connect(urls[1] || urls[0]);
@@ -86,6 +93,7 @@ try {
       "unauthorized control rejected",
       "duplicate operation deduplicated",
       "stable identity reconnect",
+      "fresh guest sync snapshot and invalid/unauthenticated sync rejection",
     ],
     passed: true,
   };

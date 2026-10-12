@@ -99,6 +99,21 @@ beforeEach(async () => {
 });
 
 describe("shared room authority across function instances", () => {
+  it("syncs from shared authority rather than the stale instance cache without a playback mutation", async () => {
+    await run(a, "host", { type: "seek", position: 24 });
+    await run(a, "host", { type: "play" });
+    now += 500;
+    const before = structuredClone(store.records.get(code)!);
+    const result = await b.sync("guest");
+    expect(result.ok).toBe(true);
+    expect(expectedPosition(result.room!, result.serverTime!)).toBe(24.5);
+    expect(result.room!.version).toBe(before.room.version);
+    expect(store.records.get(code)!.operations).toEqual(before.operations);
+    expect(JSON.stringify(result)).not.toContain(identity.token);
+    expect((await b.sync("unknown")).ok).toBe(false);
+    store.records.get(code)!.leases[before.room.hostId].owner = "foreign-host";
+    expect((await a.sync("host")).ok).toBe(false);
+  });
   it("reconstructs a playing late join from durable anchors and publishes no private tokens", async () => {
     await run(a, "host", { type: "seek", position: 20 });
     await run(a, "host", { type: "play" });

@@ -128,20 +128,31 @@ export class Engine {
     public reaction: (code: string, data: unknown) => void = () => {},
   ) {}
   restore(saved: Saved) {
-    const r = saved.room;
+    const r = structuredClone(saved.room);
     r.position = expectedPosition(r, this.now());
     r.anchor = this.now();
     r.playing = false;
+    r.version++;
     r.participants.forEach((p) => {
       p.connected = false;
       this.deadlines.set(p.id, this.now() + this.grace);
     });
     this.rooms.set(r.code, r);
-    this.tokens.set(r.code, saved.tokens);
+    this.tokens.set(r.code, { ...saved.tokens });
     this.operations.set(r.code, new Map());
   }
   snapshot(r: Room) {
     return structuredClone(r);
+  }
+  sync(socketId: string): Result {
+    const session = this.sessions.get(socketId);
+    const room = session && this.rooms.get(session.code);
+    if (
+      !room ||
+      !room.participants.some((p) => p.id === session!.id && p.connected)
+    )
+      return { ok: false, error: "Join a connected room before syncing." };
+    return { ok: true, room: this.snapshot(room), serverTime: this.now() };
   }
   commit(r: Room) {
     r.version++;

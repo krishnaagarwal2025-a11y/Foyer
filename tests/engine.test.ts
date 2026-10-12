@@ -38,6 +38,21 @@ beforeEach(() => {
   guest = engine.join("b", { name: "Guest", code }).identity!.id;
 });
 describe("room protocol and permissions", () => {
+  it("returns a fresh public sync snapshot to guests without mutating the room", () => {
+    run("a", { type: "seek", position: 24 });
+    run("a", { type: "play" });
+    now += 500;
+    const before = structuredClone(engine.rooms.get(code)!);
+    const result = engine.sync("b");
+    expect(result.ok).toBe(true);
+    expect(expectedPosition(result.room!, result.serverTime!)).toBe(24.5);
+    expect(JSON.stringify(result)).not.toContain(hostToken.token);
+    result.room!.position = 1;
+    expect(engine.rooms.get(code)).toEqual(before);
+    expect(engine.sync("stranger").ok).toBe(false);
+    engine.disconnect("b");
+    expect(engine.sync("b").ok).toBe(false);
+  });
   it("rejects resume credentials without a room before allocating resources", () => {
     const count = engine.rooms.size;
     expect(
@@ -192,10 +207,13 @@ describe("room protocol and permissions", () => {
       () => now,
       1000,
     );
-    copy.restore(saved.at(-1)!);
+    const checkpoint = structuredClone(saved.at(-1)!);
+    copy.restore(checkpoint);
     const restored = copy.rooms.get(code)!;
     expect(restored.position).toBe(2);
     expect(restored.playing).toBe(false);
+    expect(restored.version).toBe(checkpoint.room.version + 1);
+    expect(acceptSnapshot(checkpoint.room, restored)).toBe(restored);
     expect(restored.participants.every((p) => !p.connected)).toBe(true);
   });
   it("supports 10 participants and bounds room capacity", () => {

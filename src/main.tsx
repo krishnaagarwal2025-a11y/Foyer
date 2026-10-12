@@ -20,6 +20,7 @@ import { isListeningSource } from "../shared/media";
 import { acceptSnapshot as accept } from "../shared/sync";
 import "./style.css";
 import "./provider.css";
+import "./room.css";
 import type { PlaybackHandle } from "./player/FoyerPlayer";
 const FoyerPlayer = lazy(() =>
     import("./player/FoyerPlayer").then((module) => ({
@@ -66,15 +67,20 @@ function App() {
     [joining, setJoining] = useState(false),
     [self, setSelf] = useState(""),
     [tab, setTab] = useState("Chat"),
+    [sidebarView, setSidebarView] = useState<"Room" | "Discover" | "People">(
+      "Room",
+    ),
     [query, setQuery] = useState(""),
     [filter, setFilter] = useState("All"),
-    [playable, setPlayable] = useState(false),
+    [playable, setPlayable] = useState(true),
     [cinema, setCinema] = useState(false),
     [diagnostics, setDiagnostics] = useState(false),
     [rtt, setRtt] = useState(0),
     [drift, setDrift] = useState(0),
     [offset, setOffset] = useState(0),
     [blocked, setBlocked] = useState(false),
+    [syncMessage, setSyncMessage] = useState(""),
+    [syncing, setSyncing] = useState(false),
     [playerAttempt, setPlayerAttempt] = useState(0),
     [videoError, setVideoError] = useState(""),
     [position, setPosition] = useState(0),
@@ -91,6 +97,13 @@ function App() {
     blockedRef = useRef(false),
     resume = useRef<{ code: string; name: string } | null>(null),
     loadedRevision = useRef(-1),
+    manualSync = useRef<{
+      id: string;
+      expires: number;
+      confirmed: boolean;
+      adjusted: boolean;
+    } | null>(null),
+    playPending = useRef(false),
     syncRef = useRef<() => void>(() => {}),
     selfRef = useRef(""),
     playbackOperation = useRef<{
@@ -142,6 +155,9 @@ function App() {
             return;
           }
           const r = result.room!;
+          manualSync.current = null;
+          setSyncing(false);
+          setSyncMessage("");
           setSelf(result.identity!.id);
           sessionStorage.setItem("name", name.trim());
           sessionStorage.setItem(
@@ -258,6 +274,9 @@ function App() {
       }
     });
     s.on("closed", () => {
+      manualSync.current = null;
+      setSyncing(false);
+      setSyncMessage("");
       resume.current = null;
       setRoom(null);
       setCode("");
@@ -352,6 +371,14 @@ function App() {
   const synchronize = useCallback(() => {
     const r = latest.current,
       v = video.current;
+    const request = manualSync.current;
+    if (request && performance.now() > request.expires) {
+      manualSync.current = null;
+      setSyncing(false);
+      setSyncMessage(
+        "Sync could not finish. Check the source or retry when buffering stops.",
+      );
+    }
     if (
       !r ||
       !v ||
@@ -370,27 +397,61 @@ function App() {
     // Start/resume first. Seeking a paused iframe before it has started can
     // restart its buffer on every correction and prevent it ever catching up.
     if (r.playing && v.paused) {
-      if (!blockedRef.current)
+      if (!blockedRef.current && !playPending.current) {
+        playPending.current = true;
         v.play()
-          .then(() => setBlocked(false))
-          .catch(() => setBlocked(true));
+          .then(() => {
+            if (video.current !== v) return;
+            blockedRef.current = false;
+            setBlocked(false);
+          })
+          .catch(() => {
+            if (video.current !== v) return;
+            blockedRef.current = true;
+            setBlocked(true);
+            if (manualSync.current) {
+              manualSync.current = null;
+              setSyncing(false);
+              setSyncMessage(
+                "Playback was blocked. Click to sync and play, or allow playback in your browser.",
+              );
+            }
+          })
+          .finally(() => {
+            if (video.current === v) playPending.current = false;
+          });
+      }
       return;
     }
     if (!r.playing && !v.paused) {
       v.pause();
       return;
     }
-    const fix = correction(delta, r.playing);
+    const force = !!manualSync.current && !manualSync.current.adjusted;
+    const fix = force
+      ? { seek: Math.abs(delta) > 0.02, rate: 1 }
+      : correction(delta, r.playing);
     if (v.supportsRate === false) {
       fix.rate = 1;
-      fix.seek = Math.abs(delta) > (r.playing ? 0.4 : 0.15);
+      if (!force) fix.seek = Math.abs(delta) > (r.playing ? 0.4 : 0.15);
     }
+    if (force) manualSync.current!.adjusted = true;
     if (fix.seek) {
       try {
         v.currentTime = Math.min(expected, v.duration || expected);
       } catch {}
     }
     v.playbackRate = fix.rate;
+    if (
+      manualSync.current?.confirmed &&
+      !v.seeking &&
+      v.paused === !r.playing &&
+      Math.abs(expected - v.currentTime) <= 0.5
+    ) {
+      manualSync.current = null;
+      setSyncing(false);
+      setSyncMessage("Synced to the room. Only your player was adjusted.");
+    }
     if (
       r.version >= (playbackOperation.current?.version ?? -1) &&
       !v.seeking &&
@@ -412,7 +473,55 @@ function App() {
       );
     }
   }, []);
+  const syncNow = useCallback(() => {
+    const s = socket.current,
+      r = latest.current;
+    if (!s?.connected || status !== "Connected" || !r) {
+      setSyncMessage("Reconnect before syncing your player.");
+      return;
+    }
+    if (r.media.kind === "external") return;
+    const request = {
+      id: crypto.randomUUID(),
+      expires: performance.now() + 12000,
+      confirmed: false,
+      adjusted: false,
+    };
+    manualSync.current = request;
+    blockedRef.current = false;
+    setBlocked(false);
+    setSyncing(true);
+    setSyncMessage("Syncing your player… waiting for the room and source.");
+    // Invoke playback in the click/keyboard gesture, before awaiting the network.
+    synchronize();
+    s.timeout(5000).emit("sync", {}, (err: Error | null, result: Result) => {
+      if (manualSync.current?.id !== request.id) return;
+      if (latest.current?.code !== r.code) return;
+      if (err || !result?.ok || !result.room || result.room.code !== r.code) {
+        manualSync.current = null;
+        setSyncing(false);
+        setSyncMessage(
+          result?.error ||
+            "The room did not respond. Check your connection and retry.",
+        );
+        return;
+      }
+      const current = accept(latest.current, result.room);
+      latest.current = current;
+      setRoom((previous) => accept(previous, current));
+      request.confirmed = true;
+      request.adjusted = false;
+      synchronize();
+    });
+  }, [status, synchronize]);
   syncRef.current = synchronize;
+  useEffect(() => {
+    if (status !== "Connected" && manualSync.current) {
+      manualSync.current = null;
+      setSyncing(false);
+      setSyncMessage("Connection lost. Sync again after reconnecting.");
+    }
+  }, [status]);
   useEffect(() => {
     if (!room) return;
     if (room.media.kind === "external") {
@@ -426,6 +535,7 @@ function App() {
   useEffect(() => {
     if (!room) return;
     loadedRevision.current = -1;
+    playPending.current = false;
     setVideoError("Loading source…");
     setBlocked(false);
     if (room.media.kind === "external") {
@@ -454,13 +564,17 @@ function App() {
     const key = (e: KeyboardEvent) => {
       if (
         !latest.current ||
+        e.altKey ||
+        e.ctrlKey ||
+        e.metaKey ||
+        e.repeat ||
         (e.target instanceof HTMLElement &&
           (/INPUT|TEXTAREA|SELECT|BUTTON/.test(e.target.tagName) ||
             e.target.isContentEditable))
       )
         return;
       if (e.key.toLowerCase() === "c") setCinema((v) => !v);
-      if (e.key.toLowerCase() === "s") synchronize();
+      if (e.key.toLowerCase() === "s") syncNow();
       if (e.code === "Space") {
         e.preventDefault();
         if (canControl)
@@ -483,7 +597,7 @@ function App() {
       document.removeEventListener("visibilitychange", visibility);
       window.removeEventListener("keydown", key);
     };
-  }, [canControl, command, synchronize]);
+  }, [canControl, command, synchronize, syncNow]);
   const preferences = room?.participants.flatMap((p) => p.preferences) || [];
   const scored = catalog
     .filter((m) => room?.settings.mode !== "listen" || isListeningSource(m))
@@ -768,22 +882,7 @@ function App() {
               </span>
             </div>
             {blocked && (
-              <button
-                className="autoplay primary"
-                onClick={() => {
-                  video.current
-                    ?.play()
-                    .then(() => {
-                      setBlocked(false);
-                      synchronize();
-                    })
-                    .catch(() =>
-                      setVideoError(
-                        "Playback blocked. Interact with this page and try again.",
-                      ),
-                    );
-                }}
-              >
+              <button className="autoplay primary" onClick={syncNow}>
                 Click to sync and play
               </button>
             )}
@@ -870,12 +969,25 @@ function App() {
             </button>
             <button
               className="small"
-              onClick={synchronize}
-              disabled={room.media.kind === "external"}
+              onClick={syncNow}
+              disabled={
+                room.media.kind === "external" ||
+                status !== "Connected" ||
+                syncing
+              }
+              aria-describedby="sync-feedback"
             >
-              ↔ Sync me now
+              {syncing ? "Syncing…" : "↔ Sync me now"}
             </button>
           </div>
+          <p
+            id="sync-feedback"
+            className="sync-feedback"
+            role="status"
+            aria-live="polite"
+          >
+            {syncMessage}
+          </p>
           <div className="under-player">
             <span>
               {host
@@ -906,9 +1018,10 @@ function App() {
             >
               {diagnostics ? "Hide" : "Show"} sync diagnostics
             </button>
-            <span>
-              Shortcuts: Space play/pause · ← → seek · S sync · C cinema
-            </span>
+            <details className="shortcut-help">
+              <summary>Keyboard shortcuts</summary>
+              <p>Space play/pause · ← → seek · S sync · C cinema</p>
+            </details>
           </div>
           {diagnostics && (
             <div className="diagnostic">
@@ -933,199 +1046,250 @@ function App() {
           )}
           {!cinema && (
             <>
-              <section className="panel source-panel">
-                <h3>Add a link to the room</h3>
-                <p className="muted">
-                  Paste YouTube / YouTube Music, Vimeo, SoundCloud, direct
-                  audio/video or on-demand HLS. Subscription titles open in the
-                  companion extension. Players confirm duration when available.
-                </p>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const data = new FormData(
-                      e.currentTarget,
-                      (e.nativeEvent as SubmitEvent).submitter,
-                    );
-                    command({
-                      type: "source",
-                      enqueue: data.get("action") === "queue",
-                      media: {
-                        title: String(data.get("title")),
-                        url: String(data.get("url")),
-                        duration: Number(data.get("duration")),
-                      },
-                    });
-                  }}
-                >
-                  <input
-                    name="title"
-                    aria-label="Custom media title"
-                    placeholder="Title"
-                    maxLength={100}
-                    required
-                  />
-                  <input
-                    name="url"
-                    aria-label="Custom media URL"
-                    type="url"
-                    placeholder="YouTube, SoundCloud or a direct media URL"
-                    required
-                  />
-                  <input
-                    name="duration"
-                    aria-label="Custom duration seconds"
-                    type="number"
-                    min="1"
-                    max="43200"
-                    defaultValue="600"
-                    required
-                  />
-                  <button name="action" value="play" disabled={!canControl}>
-                    {room.settings.mode === "listen"
-                      ? "Play audio"
-                      : "Load video"}
-                  </button>
-                  <button
-                    name="action"
-                    value="queue"
-                    disabled={status !== "Connected"}
+              <details className="panel source-panel">
+                <summary>
+                  <span>＋ Add a link</span>
+                  <small>YouTube, music or direct media</small>
+                </summary>
+                <div className="source-content">
+                  <p className="muted">
+                    Play a link or add it to the shared queue. The player checks
+                    its duration.
+                    <a href="/help" target="_blank" rel="noreferrer">
+                      {" "}
+                      Supported sources ↗
+                    </a>
+                  </p>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const data = new FormData(
+                        e.currentTarget,
+                        (e.nativeEvent as SubmitEvent).submitter,
+                      );
+                      command({
+                        type: "source",
+                        enqueue: data.get("action") === "queue",
+                        media: {
+                          title: String(data.get("title")),
+                          url: String(data.get("url")),
+                          duration: Number(data.get("duration")),
+                        },
+                      });
+                    }}
                   >
-                    Add to queue
-                  </button>
-                </form>
-              </section>
+                    <label>
+                      Title
+                      <input
+                        name="title"
+                        aria-label="Custom media title"
+                        placeholder="Title"
+                        maxLength={100}
+                        required
+                      />
+                    </label>
+                    <label className="source-url">
+                      Media link
+                      <input
+                        name="url"
+                        aria-label="Custom media URL"
+                        type="url"
+                        placeholder="YouTube, SoundCloud or a direct media URL"
+                        required
+                      />
+                    </label>
+                    <label className="source-duration">
+                      Duration estimate (seconds)
+                      <input
+                        name="duration"
+                        aria-label="Custom duration seconds"
+                        type="number"
+                        min="1"
+                        max="43200"
+                        defaultValue="600"
+                        required
+                      />
+                    </label>
+                    <div className="source-actions">
+                      <button name="action" value="play" disabled={!canControl}>
+                        {room.settings.mode === "listen"
+                          ? "Play audio"
+                          : "Load video"}
+                      </button>
+                      <button
+                        name="action"
+                        value="queue"
+                        disabled={status !== "Connected"}
+                      >
+                        Add to queue
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </details>
             </>
           )}
         </section>
         {!cinema && (
           <aside className="sidebar">
-            {room.settings.mode === "listen" && (
-              <Suspense
-                fallback={
-                  <div className="panel" role="status">
-                    Loading music discovery…
-                  </div>
-                }
-              >
-                <MusicDiscovery
-                  command={command}
-                  canControl={canControl}
-                  connected={status === "Connected"}
-                />
-              </Suspense>
-            )}
-            <section className="discovery panel">
-              <div className="section-heading">
-                <div>
-                  <div className="eyebrow">FIND YOUR NEXT SHARED OBSESSION</div>
-                  <h2>
-                    {room.settings.mode === "listen"
-                      ? "Your local listening library."
-                      : "Something for everyone."}
-                  </h2>
-                </div>
-                <span className="pill">{catalog.length} SAMPLE TITLES</span>
-              </div>
-              <div className="search-row">
-                <input
-                  aria-label="Search movies"
-                  placeholder="⌕ Search titles, genres or moods…"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-                <select
-                  aria-label="Filter genre"
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
+            <nav className="sidebar-nav" aria-label="Room tools">
+              {(["Room", "Discover", "People"] as const).map((view) => (
+                <button
+                  key={view}
+                  aria-pressed={sidebarView === view}
+                  aria-controls={`sidebar-${view.toLowerCase()}`}
+                  onClick={() => setSidebarView(view)}
                 >
-                  {["All", ...genres, ...moods].map((g) => (
-                    <option key={g}>{g}</option>
-                  ))}
-                </select>
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={playable}
-                    onChange={(e) => setPlayable(e.target.checked)}
-                  />
-                  Playable only
-                </label>
-              </div>
-              <p className="muted">
-                Recommendations count matching preferences across your group.
-                Sample concepts are discovery metadata; only cards marked
-                playable have video.
-              </p>
-              <div className="movie-grid">
-                {movies.slice(0, 12).map((m, i) => (
-                  <article className="movie" key={m.id}>
-                    <div
-                      className="movie-art"
-                      style={
-                        { "--movie-color": m.color } as React.CSSProperties
-                      }
-                    >
-                      <span className="movie-number">
-                        {String(i + 1).padStart(2, "0")}
-                      </span>
-                      <span>
-                        {m.url
-                          ? m.kind === "audio"
-                            ? "♪ LOCAL AUDIO"
-                            : "▶ LOCAL & PLAYABLE"
-                          : "DISCOVERY SAMPLE"}
-                      </span>
-                      <strong>{m.title}</strong>
+                  {view}
+                  {view === "People" && (
+                    <span className="nav-count">
+                      {room.participants.length}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </nav>
+            <div
+              id="sidebar-discover"
+              className="sidebar-page"
+              hidden={sidebarView !== "Discover"}
+            >
+              {room.settings.mode === "listen" && (
+                <Suspense
+                  fallback={
+                    <div className="panel" role="status">
+                      Loading music discovery…
                     </div>
-                    <h3>{m.title}</h3>
-                    <small>
-                      {m.genres.join(" · ")} · {Math.round(m.duration / 60)} min
-                    </small>
-                    <p>{m.description}</p>
-                    {m.score > 0 && (
-                      <p className="match">
-                        ✦ {m.score} preference matches: {m.why}
-                      </p>
-                    )}
-                    <div className="card-actions">
-                      <button
-                        disabled={status !== "Connected"}
-                        onClick={() =>
-                          command({ type: "enqueue", movieId: m.id })
+                  }
+                >
+                  <MusicDiscovery
+                    command={command}
+                    canControl={canControl}
+                    connected={status === "Connected"}
+                  />
+                </Suspense>
+              )}
+              <section className="discovery panel">
+                <div className="section-heading">
+                  <div>
+                    <div className="eyebrow">DISCOVER TOGETHER</div>
+                    <h2>
+                      {room.settings.mode === "listen"
+                        ? "Your local listening library."
+                        : "Find your next watch."}
+                    </h2>
+                  </div>
+                  <span className="pill">{catalog.length} samples</span>
+                </div>
+                <div className="search-row">
+                  <input
+                    aria-label="Search movies"
+                    placeholder="⌕ Search titles, genres or moods…"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                  <select
+                    aria-label="Filter genre"
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value)}
+                  >
+                    {["All", ...genres, ...moods].map((g) => (
+                      <option key={g}>{g}</option>
+                    ))}
+                  </select>
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={playable}
+                      onChange={(e) => setPlayable(e.target.checked)}
+                    />
+                    Playable only
+                  </label>
+                </div>
+                <details className="discovery-help">
+                  <summary>About these recommendations</summary>
+                  <p className="muted">
+                    Matches use the group’s genres and moods. Sample titles are
+                    discovery metadata; only playable cards have media.
+                  </p>
+                </details>
+                <div className="movie-grid">
+                  {movies.slice(0, 12).map((m, i) => (
+                    <article className="movie" key={m.id}>
+                      <div
+                        className="movie-art"
+                        style={
+                          { "--movie-color": m.color } as React.CSSProperties
                         }
                       >
-                        ＋ Queue
-                      </button>
-                      {m.url && (
+                        <span className="movie-number">
+                          {String(i + 1).padStart(2, "0")}
+                        </span>
+                        <span>
+                          {m.url
+                            ? m.kind === "audio"
+                              ? "♪ LOCAL AUDIO"
+                              : "▶ LOCAL & PLAYABLE"
+                            : "DISCOVERY SAMPLE"}
+                        </span>
+                        <strong>{m.title}</strong>
+                      </div>
+                      <h3>{m.title}</h3>
+                      <small>
+                        {m.genres.join(" · ")} · {Math.round(m.duration / 60)}{" "}
+                        min
+                      </small>
+                      <details className="movie-description">
+                        <summary>About this title</summary>
+                        <p>{m.description}</p>
+                      </details>
+                      {m.score > 0 && (
+                        <p className="match">
+                          ✦ {m.score} preference matches: {m.why}
+                        </p>
+                      )}
+                      <div className="card-actions">
                         <button
-                          disabled={!canControl}
+                          disabled={status !== "Connected"}
                           onClick={() =>
-                            command({ type: "media", movieId: m.id })
+                            command({ type: "enqueue", movieId: m.id })
                           }
                         >
-                          Watch
+                          ＋ Queue
                         </button>
-                      )}
-                    </div>
-                  </article>
-                ))}
-              </div>
-              {!movies.length && (
-                <div className="empty">
-                  No matches. Try another title, genre or mood.
+                        {m.url && (
+                          <button
+                            disabled={!canControl}
+                            onClick={() =>
+                              command({ type: "media", movieId: m.id })
+                            }
+                          >
+                            {m.kind === "audio" ? "Listen" : "Watch"}
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  ))}
                 </div>
-              )}
-              {movies.length > 12 && (
-                <p className="muted">
-                  Showing the top 12 matches. Narrow your search to find more.
-                </p>
-              )}
-            </section>
-
-            <section className="panel participants">
+                {!movies.length && (
+                  <div className="empty">
+                    No matches. Try another title, genre or mood.
+                  </div>
+                )}
+                {movies.length > 12 && (
+                  <p className="muted">
+                    Showing the top 12 matches. Narrow your search to find more.
+                  </p>
+                )}
+              </section>
+            </div>
+            <section
+              className="panel participants sidebar-page"
+              id="sidebar-people"
+              hidden={sidebarView !== "People"}
+            >
               <div className="section-heading">
-                <h2>The audience</h2>
+                <h2>Your people</h2>
                 <span className="count">{room.participants.length}</span>
               </div>
               {room.participants.map((p, i) => (
@@ -1233,10 +1397,19 @@ function App() {
                 </details>
               )}
             </section>
-            <section className="panel social">
+            <section
+              className="panel social sidebar-page"
+              id="sidebar-room"
+              hidden={sidebarView !== "Room"}
+            >
+              <div className="activity-heading">
+                <h2>Your room</h2>
+                <p>Chat, plan the next watch, or save a moment.</p>
+              </div>
               <nav className="tabs" aria-label="Room activity">
                 {["Chat", "Queue", "Polls", "Moments"].map((t) => (
                   <button
+                    aria-pressed={tab === t}
                     className={tab === t ? "active" : ""}
                     key={t}
                     onClick={() => setTab(t)}
@@ -1276,7 +1449,12 @@ function App() {
                     <div className="empty">
                       Your next feature awaits.
                       <br />
-                      Add a title from discovery.
+                      <button
+                        className="text-button"
+                        onClick={() => setSidebarView("Discover")}
+                      >
+                        Find something in Discover →
+                      </button>
                     </div>
                   )}
                   {room.queue.map((q) => (
@@ -1428,7 +1606,7 @@ function App() {
         )}
       </main>
       <footer>
-        Foyer · Together, from anywhere.<span>Local cinema · {room.code}</span>
+        Foyer · Together, from anywhere.<span>Room {room.code}</span>
       </footer>
     </div>
   );

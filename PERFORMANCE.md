@@ -99,3 +99,9 @@ URL: https://foyer-cyan.vercel.app. Ten clients ran on the Windows machine above
 Raw evidence: `evidence/vercel-socket-benchmark.json`, `evidence/vercel-browser-benchmark.json`, `evidence/vercel-check.json`, `evidence/cloud-check.json`. No missing browser samples or workflow failures were recorded. Video playback used the included demo MP4 served by Vercel; browser autoplay was allowed and audio muted. Browser throttling was disabled. Clock calibration maximum RTT was 2.70 ms. Windows memory pressure was present during the run; unrelated tool launches exhausted commit memory, but all ten contexts completed and reported actual samples. Windows load average is not a CPU measurement. These results do not establish all-device or third-party-media performance, or verify natural 300-second function rotation. Explicit reconnect and cross-process identity recovery were tested; expired-worker lease/election behavior is covered by cloud unit tests.
 
 Repeat using BENCH_URL or DEMO_URL set to the production URL, with BENCH_REPORT selecting a separate evidence file. The deployment is described in DEPLOYMENT.md.
+
+## Sync and layout review measurements
+
+After the manual-sync fix and sidebar reorganization, all **46 unit tests** and **six local browser workflows** pass. Extension packaging, TypeScript checks and the production build pass. Live YouTube API-demo playback reached 5.24 seconds with readyState 4 (actual provider video, not the fixture); see `evidence/sync-review-youtube.json`. Provider availability varies by title/account/browser.
+
+The ten-client localhost socket run (`evidence/sync-review-local-socket.json`) collected 810 deliveries after nine warm-up controls: p50 **5.35 ms**, p95 **6.79 ms**, maximum **12.79 ms**. This is socket delivery only. Public browser measurements for this revised version are recorded separately after deployment.

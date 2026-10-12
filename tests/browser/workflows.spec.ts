@@ -91,9 +91,12 @@ test("two browsers complete the social and synchronized playback workflow", asyn
     ).toBeVisible();
     await guest.getByRole("button", { name: "React 🔥" }).click();
     await expect(host.locator(".floating-reactions")).toContainText("🔥");
+    await host.getByRole("button", { name: "Discover", exact: true }).click();
+    await host.getByLabel("Playable only").uncheck();
     await host.getByLabel("Search movies").fill("quiet orbt");
     await expect(host.locator(".movie h3")).toContainText(["The Quiet Orbit"]);
     await host.getByLabel("Search movies").fill("");
+    await guest.getByRole("button", { name: /^People/ }).click();
     await guest.getByText("Your movie preferences", { exact: true }).click();
     await guest.getByRole("button", { name: "Wonder", exact: true }).click();
     await expect(host.locator(".match").first()).toContainText("Wonder");
@@ -103,6 +106,8 @@ test("two browsers complete the social and synchronized playback workflow", asyn
       .filter({ hasText: "Cinema Color Journey" })
       .getByRole("button", { name: "＋ Queue" })
       .click();
+    await guest.getByRole("button", { name: "Room", exact: true }).click();
+    await host.getByRole("button", { name: "Room", exact: true }).click();
     await guest.getByRole("button", { name: "Queue 1", exact: true }).click();
     await guest.getByRole("button", { name: "↑ 0 votes" }).click();
     await host.getByRole("button", { name: "Queue 1", exact: true }).click();
@@ -140,6 +145,7 @@ test("two browsers complete the social and synchronized playback workflow", asyn
         guest.locator("video").evaluate((v: HTMLVideoElement) => v.currentTime),
       )
       .toBeCloseTo(22, 0);
+    await host.getByRole("button", { name: /^People/ }).click();
     await host.getByRole("button", { name: "Transfer host to Jordan" }).click();
     await expect(
       guest.getByRole("button", { name: "Play", exact: true }),
@@ -160,6 +166,7 @@ test("two browsers complete the social and synchronized playback workflow", asyn
       .click();
     await guest.keyboard.press("c");
     await expect(guest.locator(".sidebar")).toHaveCount(1);
+    await host.getByRole("button", { name: "Room", exact: true }).click();
     await host.screenshot({
       path: "evidence/room-desktop.png",
       fullPage: true,
@@ -274,6 +281,7 @@ test("late join snapshots playback, corrects drift and recovers from a bad sourc
         late.locator("video").evaluate((v: HTMLVideoElement) => v.paused),
       )
       .toBe(true);
+    await host.locator(".source-panel > summary").click();
     await host.getByLabel("Custom media title").fill("Missing source");
     await host
       .getByLabel("Custom media URL")

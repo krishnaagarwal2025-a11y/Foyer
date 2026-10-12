@@ -49,3 +49,22 @@
 - Production verified: https://foyer-cyan.vercel.app, health shared-redis, catalog/help/media/extension all HTTP 200.
 - All four browser workflows pass locally and publicly; 10 isolated browser contexts pass public performance targets (see PERFORMANCE.md).
 - Local SQLite demo restarted at http://localhost:3001; temporary cloud servers stopped.
+
+## Sync repair and room clarity review
+
+Checklist / plan:
+- [ ] Manual sync forces position/rate correction, retries blocked playback during the click gesture, and reports pending/success/error states.
+- [ ] Fetch a current membership-validated snapshot without changing global playback or granting guest control.
+- [ ] Keep player + chat as the default view; separate Discover and People views; collapse Add a link and secondary help.
+- [ ] Review source loading, disconnected states, keyboard shortcuts, accessible controls and responsive overflow.
+- [ ] Add regression coverage for manual sync in direct media and YouTube, including autoplay, modest drift and no command feedback.
+- [ ] Run unit/protocol, build, extension checks and multi-client browser flows; inspect refreshed screenshots.
+- [ ] Re-run ten-client benchmarks, document evidence, push main and redeploy the verified version.
+Assumptions: manual sync affects only the clicking participant. Existing room controls, provider policies and host permissions remain authoritative. Discovery defaults to playable media, with all sample metadata available through the filter.
+
+Sync review verification:
+- Local suite: 46 unit tests / six browser workflows pass, including direct and asynchronous YouTube manual recovery and timeout/offline paths.
+- Build, TypeScript and extension package checks pass; real YouTube demo playback succeeds (evidence/sync-review-youtube.json).
+- Desktop/mobile screenshots inspected: evidence/room-clear-desktop.png and evidence/room-clear-mobile.png.
+- Local ten-client socket p95 6.79 ms, 810 samples. Public deployment verification next.
+- Restore now clones checkpoints and advances versions; keyboard shortcuts ignore modifiers/repeat; delayed sync replies cannot re-open an expired/different room.

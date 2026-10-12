@@ -234,6 +234,27 @@ export class CloudCoordinator {
       return { ok: false, error: "Could not allocate a room. Retry." };
     });
   }
+  async sync(sid: string): Promise<Result> {
+    const session = this.engine.sessions.get(sid);
+    if (!session) return { ok: false, error: "Join a room first." };
+    return this.locked(session.code, async (owner) => {
+      const record = await this.store.load(session.code);
+      if (!record)
+        return { ok: false, error: "Room expired. Create a new room." };
+      this.events.delete(session.code);
+      this.load(record);
+      this.renew(record);
+      this.reconcile(record);
+      if (record.leases[session.id]?.owner !== sid)
+        return {
+          ok: false,
+          error: "Session expired. Reload and rejoin the room.",
+        };
+      const result = this.engine.sync(sid);
+      await this.flush(session.code, session.code, owner, record.leases);
+      return result;
+    });
+  }
   async apply(sid: string, input: unknown): Promise<Result> {
     const session = this.engine.sessions.get(sid);
     if (!session) return { ok: false, error: "Join a room first." };
