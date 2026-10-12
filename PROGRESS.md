@@ -30,4 +30,4 @@
 - Final demo clip: 90 seconds, 320×180, 15 fps, one-second keyframes, approximately 3 MiB. Main desktop/mobile screenshots inspected; latest ten-browser screenshot saved.
 - Security review fixed resume-without-code room allocation and added a regression test. A fake-clock host-election test fixture was corrected to distinguish arrival timestamps; engine tie-breaking remains deterministic by ID.
 - README, requirements map, performance methodology/conditions/limitations, demo walkthrough and viva notes reflect final implementation. Actual physical LAN and non-Chromium performance remain unverified; repeat instructions included.
-- Compiled demo left running at **http://localhost:3001**. Health endpoint returns OK; catalog endpoint returns 26 entries; server error log empty.
+- Documented development startup (`npm run dev`) left running at **http://localhost:5173** with API/backend on port 3001. Health endpoint returns OK; catalog endpoint returns 26 entries.
