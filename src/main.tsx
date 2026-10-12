@@ -25,6 +25,7 @@ import "./style.css";
 import "./provider.css";
 import "./room.css";
 import type { PlaybackHandle } from "./player/FoyerPlayer";
+import { PlayerBoundary } from "./player/PlayerBoundary";
 const FoyerPlayer = lazy(() =>
     import("./player/FoyerPlayer").then((module) => ({
       default: module.FoyerPlayer,
@@ -682,6 +683,9 @@ function App() {
     if (!room) return;
     loadedRevision.current = -1;
     playPending.current = false;
+    manualSync.current = null;
+    setSyncing(false);
+    setSyncMessage("");
     setProtocolMessage("");
     setLastCheck(null);
     setVideoError("Loading source…");
@@ -928,8 +932,22 @@ function App() {
         </div>
         <div className="room-label">
           <span className="live-dot" /> ROOM <strong>{room.code}</strong>
-          <button className="small" onClick={copy}>
-            {copied ? "Copied!" : "↗ Invite friends"}
+          <button
+            className="small"
+            onClick={copy}
+            aria-label={copied ? "Copied!" : "Invite friends"}
+          >
+            {copied ? (
+              "Copied!"
+            ) : (
+              <>
+                <span aria-hidden="true">↗ Invite</span>
+                <span className="invite-extra" aria-hidden="true">
+                  {" "}
+                  friends
+                </span>
+              </>
+            )}
           </button>
         </div>
         <span className="connection">
@@ -967,58 +985,74 @@ function App() {
             </button>
           </div>
           <div className="player">
-            <Suspense
-              fallback={
-                <div className="provider-loading" role="status">
-                  Loading room player…
-                </div>
-              }
+            <PlayerBoundary
+              key={`${room.mediaRevision}:${playerAttempt}`}
+              onFailure={() => {
+                loadedRevision.current = -1;
+                playPending.current = false;
+                setVideoError(
+                  "The player failed to initialize. Retry this source or choose another link.",
+                );
+              }}
             >
-              <FoyerPlayer
-                key={`${room.mediaRevision}:${playerAttempt}`}
-                ref={video}
-                media={room.media}
-                revision={room.mediaRevision}
-                muted={muted}
-                onProviderControl={(type, position) => {
-                  const current = latest.current;
-                  if (!current || !canControl) return false;
-                  if (type !== "seek" && current.playing === (type === "play"))
-                    return false;
-                  command(type === "seek" ? { type, position } : { type });
-                  return true;
-                }}
-                onReady={() => {
-                  loadedRevision.current = room.mediaRevision;
-                  setVideoError("");
-                  const duration = video.current?.duration;
-                  if (
-                    host &&
-                    duration &&
-                    Number.isFinite(duration) &&
-                    Math.abs(duration - room.media.duration) > 0.5
-                  )
-                    command({ type: "duration", duration });
-                  synchronize();
-                }}
-                onPlaying={() => {
-                  setVideoError("");
-                  synchronize();
-                }}
-                onSeeked={() => synchronize()}
-                onError={(message) => {
-                  if (message.toLowerCase().includes("autoplay"))
-                    setBlocked(true);
-                  else setVideoError(message);
-                }}
-                onWaiting={() =>
-                  setVideoError("Buffering… playback will catch up when ready.")
+              <Suspense
+                fallback={
+                  <div className="provider-loading" role="status">
+                    Loading room player…
+                  </div>
                 }
-                onEnded={() => {
-                  if (host) command({ type: "ended" });
-                }}
-              />
-            </Suspense>
+              >
+                <FoyerPlayer
+                  key={`${room.mediaRevision}:${playerAttempt}`}
+                  ref={video}
+                  media={room.media}
+                  revision={room.mediaRevision}
+                  muted={muted}
+                  onProviderControl={(type, position) => {
+                    const current = latest.current;
+                    if (!current || !canControl) return false;
+                    if (
+                      type !== "seek" &&
+                      current.playing === (type === "play")
+                    )
+                      return false;
+                    command(type === "seek" ? { type, position } : { type });
+                    return true;
+                  }}
+                  onReady={() => {
+                    loadedRevision.current = room.mediaRevision;
+                    setVideoError("");
+                    const duration = video.current?.duration;
+                    if (
+                      host &&
+                      duration &&
+                      Number.isFinite(duration) &&
+                      Math.abs(duration - room.media.duration) > 0.5
+                    )
+                      command({ type: "duration", duration });
+                    synchronize();
+                  }}
+                  onPlaying={() => {
+                    setVideoError("");
+                    synchronize();
+                  }}
+                  onSeeked={() => synchronize()}
+                  onError={(message) => {
+                    if (message.toLowerCase().includes("autoplay"))
+                      setBlocked(true);
+                    else setVideoError(message);
+                  }}
+                  onWaiting={() =>
+                    setVideoError(
+                      "Buffering… playback will catch up when ready.",
+                    )
+                  }
+                  onEnded={() => {
+                    if (host) command({ type: "ended" });
+                  }}
+                />
+              </Suspense>
+            </PlayerBoundary>
             <div className="player-top">
               <span className="pill">
                 {room.playing
@@ -1091,13 +1125,14 @@ function App() {
           )}
           <div className="transport">
             <button
+              className="play-button"
               aria-label={room.playing ? "Pause" : "Play"}
               disabled={!canControl || preparingPlay}
               onClick={() => command({ type: room.playing ? "pause" : "play" })}
             >
               {room.playing ? "Ⅱ" : "▶"}
             </button>
-            <span>{time(position)}</span>
+            <span className="elapsed-time">{time(position)}</span>
             <input
               aria-label="Seek playback"
               type="range"
@@ -1111,21 +1146,22 @@ function App() {
                 command({ type: "seek", position: Number(e.target.value) });
               }}
             />
-            <span>{time(room.media.duration)}</span>
+            <span className="duration-time">{time(room.media.duration)}</span>
             <button
+              className="sound-button"
               aria-label="Toggle sound"
               disabled={room.media.kind === "external"}
               onClick={() => {
-                if (video.current) {
-                  video.current.muted = !video.current.muted;
-                  setMuted(video.current.muted);
-                }
+                // Keep the preference even before the new provider is ready.
+                const next = !muted;
+                if (video.current) video.current.muted = next;
+                setMuted(next);
               }}
             >
               {muted ? "🔇" : "🔊"}
             </button>
             <button
-              className="small"
+              className="small sync-button"
               onClick={syncNow}
               disabled={
                 room.media.kind === "external" ||

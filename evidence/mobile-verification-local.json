@@ -1,0 +1,111 @@
+{
+  "url": "http://localhost:3001",
+  "checkedAt": "2026-10-12T18:09:41.944Z",
+  "passed": true,
+  "layouts": [
+    {
+      "label": "320px Room",
+      "viewport": 320,
+      "document": 320,
+      "overflowing": []
+    },
+    {
+      "label": "320px Discover",
+      "viewport": 320,
+      "document": 320,
+      "overflowing": []
+    },
+    {
+      "label": "320px People",
+      "viewport": 320,
+      "document": 320,
+      "overflowing": []
+    },
+    {
+      "label": "320px Add link",
+      "viewport": 320,
+      "document": 320,
+      "overflowing": []
+    },
+    {
+      "label": "360px Room",
+      "viewport": 360,
+      "document": 360,
+      "overflowing": []
+    },
+    {
+      "label": "360px Discover",
+      "viewport": 360,
+      "document": 360,
+      "overflowing": []
+    },
+    {
+      "label": "360px People",
+      "viewport": 360,
+      "document": 360,
+      "overflowing": []
+    },
+    {
+      "label": "360px Add link",
+      "viewport": 360,
+      "document": 360,
+      "overflowing": []
+    },
+    {
+      "label": "390px Room",
+      "viewport": 390,
+      "document": 390,
+      "overflowing": []
+    },
+    {
+      "label": "390px Discover",
+      "viewport": 390,
+      "document": 390,
+      "overflowing": []
+    },
+    {
+      "label": "390px People",
+      "viewport": 390,
+      "document": 390,
+      "overflowing": []
+    },
+    {
+      "label": "390px Add link",
+      "viewport": 390,
+      "document": 390,
+      "overflowing": []
+    },
+    {
+      "label": "430px Room",
+      "viewport": 430,
+      "document": 430,
+      "overflowing": []
+    },
+    {
+      "label": "430px Discover",
+      "viewport": 430,
+      "document": 430,
+      "overflowing": []
+    },
+    {
+      "label": "430px People",
+      "viewport": 430,
+      "document": 430,
+      "overflowing": []
+    },
+    {
+      "label": "430px Add link",
+      "viewport": 430,
+      "document": 430,
+      "overflowing": []
+    },
+    {
+      "label": "844px landscape",
+      "viewport": 844,
+      "document": 844,
+      "overflowing": []
+    }
+  ],
+  "pageErrors": [],
+  "conditions": "Two isolated Chromium contexts with mobile/touch emulation, actual local audio playback. Not a physical iPhone/Android or Safari test."
+}

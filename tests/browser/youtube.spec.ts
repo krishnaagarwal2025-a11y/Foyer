@@ -8,6 +8,7 @@ async function installYouTube(context: BrowserContext) {
       instances: [],
       commands: [],
       blocked: false,
+      deferredMethods: false,
     });
     window.addEventListener("watchparty:command", (event) =>
       fixture.commands.push((event as CustomEvent).detail.command),
@@ -20,6 +21,7 @@ async function installYouTube(context: BrowserContext) {
         plays = 0;
         seeks = 0;
         destroyed = false;
+        muted: boolean | undefined;
         timer: ReturnType<typeof setTimeout> | undefined;
         iframe = document.createElement("iframe");
         constructor(
@@ -31,7 +33,22 @@ async function installYouTube(context: BrowserContext) {
           this.iframe.srcdoc =
             "<body style='background:#16121f;color:white'>Asynchronous YouTube player fixture</body>";
           el.replaceWith(this.iframe);
-          setTimeout(() => options.events.onReady({ target: this }), 20);
+          // The real API installs volume methods only after iframe readiness.
+          // Cached SDK loading makes this race more likely on song changes.
+          const mute = this.mute.bind(this),
+            unMute = this.unMute.bind(this);
+          if (fixture.deferredMethods) {
+            (this as any).mute = undefined;
+            (this as any).unMute = undefined;
+          }
+          setTimeout(
+            () => {
+              this.mute = mute;
+              this.unMute = unMute;
+              options.events.onReady({ target: this });
+            },
+            fixture.deferredMethods ? 250 : 20,
+          );
         }
         emit(state: number) {
           this.position = this.getCurrentTime();
@@ -69,13 +86,19 @@ async function installYouTube(context: BrowserContext) {
           );
         }
         getDuration() {
+          if (this.destroyed)
+            throw Error("Discarded player accessed after song change");
           return 255;
         }
         getPlayerState() {
           return this.state;
         }
-        mute() {}
-        unMute() {}
+        mute() {
+          this.muted = true;
+        }
+        unMute() {
+          this.muted = false;
+        }
         destroy() {
           this.destroyed = true;
           clearTimeout(this.timer);
@@ -314,6 +337,74 @@ test("YouTube buffering settles, native host actions synchronize, retry rebuilds
     );
     throw error;
   } finally {
+    await a.close();
+    await b.close();
+  }
+});
+
+test("changing songs with a cached YouTube SDK never blanks host or guest", async ({
+  browser,
+}) => {
+  const a = await browser.newContext(),
+    b = await browser.newContext();
+  await installYouTube(a);
+  await installYouTube(b);
+  const host = await a.newPage(),
+    guest = await b.newPage();
+  const errors: string[] = [];
+  for (const page of [host, guest])
+    page.on("pageerror", (e) => errors.push(e.message));
+  try {
+    const code = await enter(host, "Song host");
+    await enter(guest, "Song guest", code);
+    for (const page of [host, guest])
+      await page.evaluate(() => {
+        (window as any).youtubeFixture.deferredMethods = true;
+      });
+    await host.getByRole("button", { name: "♪ Listen", exact: true }).click();
+    await host.getByRole("button", { name: "Discover", exact: true }).click();
+    for (let i = 0; i < 4; i++) {
+      await host.getByLabel("YouTube Music song title").fill(`Song ${i + 1}`);
+      await host
+        .getByLabel("YouTube Music song URL")
+        .fill(`https://music.youtube.com/watch?v=abcdefghij${i}`);
+      await host
+        .getByRole("button", { name: "Play song", exact: true })
+        .click();
+      for (const page of [host, guest]) {
+        await expect(
+          page.getByRole("heading", { name: `Song ${i + 1}`, level: 1 }),
+        ).toBeVisible();
+        await expect(page.getByTitle("YouTube API fixture")).toBeVisible();
+      }
+      // Change mute while the new iframe is still loading, then switch again.
+      await host.getByRole("button", { name: "Toggle sound" }).click();
+    }
+    await expect.poll(async () => (await fixtureState(host)).count).toBe(4);
+    await expect
+      .poll(() =>
+        host.evaluate(
+          () => (window as any).youtubeFixture.instances.at(-1).muted,
+        ),
+      )
+      .toBe(false);
+    expect(
+      await host.evaluate(
+        () =>
+          (window as any).youtubeFixture.instances.filter(
+            (p: any) => p.destroyed,
+          ).length,
+      ),
+    ).toBe(3);
+    await host.getByRole("button", { name: "Play", exact: true }).click();
+    await expect.poll(async () => (await fixtureState(guest)).state).toBe(1);
+    await guest.getByRole("button", { name: "Sync me now" }).click();
+    await expect(guest.locator("#sync-feedback")).toContainText(
+      "Synced to the room",
+    );
+    expect(errors).toEqual([]);
+  } finally {
+    if (errors.length) console.error("Song-switch browser errors:", errors);
     await a.close();
     await b.close();
   }

@@ -1,0 +1,22 @@
+{
+  "url": "https://foyer-cyan.vercel.app",
+  "checkedAt": "2026-10-12T18:08:30.550Z",
+  "passed": false,
+  "switches": [
+    {
+      "title": "YouTube revision one",
+      "player": "youtube",
+      "currentTime": 2.188477,
+      "paused": false,
+      "readyState": 4,
+      "width": 854,
+      "height": 480
+    }
+  ],
+  "pageErrors": [
+    "A.unMute is not a function"
+  ],
+  "conditions": "One Chromium mobile/touch context (390×844), autoplay allowed. Public YouTube API demo repeatedly loaded under fresh room revisions, then local audio and back to YouTube. Not a physical phone or performance benchmark.",
+  "error": "locator.waitFor: Timeout 30000ms exceeded.",
+  "completedAt": "2026-10-12T18:09:07.541Z"
+}

@@ -1,0 +1,45 @@
+{
+  "url": "http://localhost:3001",
+  "checkedAt": "2026-10-12T18:18:24.510Z",
+  "passed": true,
+  "switches": [
+    {
+      "title": "YouTube revision one",
+      "player": "youtube",
+      "currentTime": 2.237977,
+      "paused": false,
+      "readyState": 4,
+      "width": 854,
+      "height": 480
+    },
+    {
+      "title": "YouTube revision two",
+      "player": "youtube",
+      "currentTime": 2.191431,
+      "paused": false,
+      "readyState": 4,
+      "width": 854,
+      "height": 480
+    },
+    {
+      "title": "Local audio interlude",
+      "player": "audio",
+      "currentTime": 2.149797,
+      "paused": false,
+      "readyState": 4
+    },
+    {
+      "title": "YouTube after audio",
+      "player": "youtube",
+      "currentTime": 2.260012,
+      "paused": false,
+      "readyState": 4,
+      "width": 854,
+      "height": 480
+    }
+  ],
+  "pageErrors": [],
+  "conditions": "One Chromium mobile/touch context (390×844), autoplay allowed. Public YouTube API demo repeatedly loaded under fresh room revisions, then local audio and back to YouTube. Not a physical phone or performance benchmark.",
+  "manualSyncConfirmed": true,
+  "completedAt": "2026-10-12T18:18:39.236Z"
+}

@@ -341,3 +341,285 @@
 .device-delay {
   color: #b4c9c4 !important;
 }
+
+/* Phone layouts use explicit rows instead of squeezing all playback controls
+   onto one line. Inputs stay at 16px to avoid focus zoom on iOS Safari. */
+@media (max-width: 600px) {
+  button,
+  a,
+  summary {
+    touch-action: manipulation;
+  }
+  button,
+  summary {
+    min-height: 44px;
+  }
+  input:not([type="checkbox"]):not([type="range"]),
+  select {
+    font-size: 16px !important;
+    min-height: 44px;
+  }
+  .app .site-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "brand mode" "invite connection";
+    gap: 12px 8px;
+    padding: calc(12px + env(safe-area-inset-top))
+      max(16px, env(safe-area-inset-right)) 12px
+      max(16px, env(safe-area-inset-left));
+  }
+  .app .brand {
+    grid-area: brand;
+  }
+  .app .room-mode {
+    grid-area: mode;
+    justify-self: end;
+  }
+  .app .room-mode button {
+    min-height: 44px;
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+  .app .room-label {
+    grid-area: invite;
+    flex-wrap: wrap;
+    gap: 6px;
+    letter-spacing: 0.5px;
+  }
+  .app .room-label .small {
+    min-height: 44px;
+    font-size: 12px;
+    padding: 8px;
+  }
+  .app .room-label .live-dot,
+  .invite-extra {
+    display: none;
+  }
+  .app .site-header .connection {
+    grid-area: connection;
+    justify-self: end;
+    font-size: 10px;
+  }
+  .room-layout {
+    padding: 0 max(16px, env(safe-area-inset-left));
+    margin-top: 18px;
+  }
+  .stage .section-heading {
+    gap: 12px;
+    align-items: start;
+  }
+  .stage .section-heading > div {
+    min-width: 0;
+  }
+  .stage .section-heading h1 {
+    font-size: 20px;
+    overflow-wrap: anywhere;
+  }
+  .stage .section-heading .secondary {
+    flex-shrink: 0;
+    min-height: 44px;
+    max-width: 100px;
+  }
+  .transport {
+    display: grid;
+    grid-template-columns: 44px 44px minmax(0, 1fr) auto;
+    grid-template-areas: "seek seek seek seek" "elapsed elapsed duration duration" "play sound sync sync";
+    gap: 6px 10px;
+    padding: 12px 0 16px;
+  }
+  .transport input {
+    grid-area: seek;
+    width: 100%;
+    height: 28px;
+    margin: 0;
+  }
+  .transport .elapsed-time {
+    grid-area: elapsed;
+    font-size: 12px;
+  }
+  .transport .duration-time {
+    grid-area: duration;
+    text-align: right;
+    font-size: 12px;
+  }
+  .transport .play-button {
+    grid-area: play;
+    min-height: 44px;
+  }
+  .transport .sound-button {
+    grid-area: sound;
+    min-height: 44px;
+  }
+  .transport .sync-button {
+    grid-area: sync;
+    width: 100%;
+    min-height: 44px;
+    font-size: 13px;
+    margin: 0;
+  }
+  .under-player {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .under-player > span {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .reaction-bar {
+    justify-content: space-between;
+  }
+  .reaction-bar button {
+    width: 44px;
+    height: 44px;
+    padding: 6px;
+  }
+  .tools-row {
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin: 4px 0 14px;
+  }
+  .tools-row summary {
+    display: flex;
+    align-items: center;
+  }
+  .sidebar {
+    margin-top: 18px;
+  }
+  .sidebar-nav {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #16131ef5;
+  }
+  .sidebar .panel,
+  .sidebar .tab-content {
+    padding: 18px;
+  }
+  .sidebar .social {
+    padding: 0;
+  }
+  .sidebar .movie-grid {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+  .sidebar .chat-messages {
+    height: min(40dvh, 300px);
+    min-height: 180px;
+    padding: 18px;
+  }
+  .search-row > select,
+  .search-row > button {
+    width: 100%;
+  }
+  .check {
+    white-space: normal;
+    min-height: 44px;
+  }
+  .music-discovery .section-heading .pill {
+    white-space: normal;
+    font-size: 9px;
+  }
+  .youtube-music-links .card-actions button {
+    flex: 1;
+  }
+  .track {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 10px;
+  }
+  .track > button {
+    grid-column: 1 / -1;
+    min-height: 44px;
+    font-size: 13px;
+  }
+  .track small {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .player:has(.audio-screen) {
+    display: block;
+    aspect-ratio: auto;
+  }
+  .audio-screen {
+    min-height: 280px;
+    padding: 52px 18px 24px;
+  }
+  .audio-screen .record-art {
+    width: 96px;
+    height: 96px;
+  }
+  .audio-screen h2 {
+    font-size: 19px;
+    overflow-wrap: anywhere;
+  }
+  .audio-screen p {
+    font-size: 12px;
+  }
+  .audio-screen .pill {
+    font-size: 9px;
+  }
+  .player-top {
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    gap: 6px;
+  }
+  .player-top .pill {
+    font-size: 8px;
+    padding: 6px 8px;
+    letter-spacing: 0.6px;
+  }
+  .video-message {
+    position: static;
+    flex-wrap: wrap;
+    margin: 10px;
+    font-size: 12px;
+  }
+  .video-message button {
+    min-height: 44px;
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+  .player:has(.video-message) {
+    display: block;
+    aspect-ratio: auto;
+  }
+  .player video {
+    display: block;
+    aspect-ratio: 16 / 9;
+  }
+  .autoplay {
+    max-width: calc(100% - 32px);
+    font-size: 13px;
+  }
+  .diagnostic {
+    gap: 12px;
+  }
+  .diagnostic b {
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
+  .source-panel form button {
+    white-space: normal;
+    font-size: 13px;
+  }
+  .queue-item,
+  .poll,
+  .bookmark {
+    overflow-wrap: anywhere;
+  }
+  .app footer {
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button {
+    transition: none;
+  }
+  .floating-reactions span {
+    animation: none;
+  }
+}

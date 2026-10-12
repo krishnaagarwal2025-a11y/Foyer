@@ -99,3 +99,12 @@ Final public verification:
 - Source, documentation and raw successes/failures retained. Local demo remains running at port 3001. GitHub main and final Vercel update being completed.
 
 Completed: runtime source da7ab0a is deployed and final public protocol/YouTube regressions pass. GitHub main includes the source and measured evidence; local demo remains at http://localhost:3001. No core blocker remains; extension runtime/subscription verification limits are recorded above.
+
+## Song switching and phone optimization (2026-10-12)
+- Reproduced a complete blank page on both participants with a cached YouTube SDK and deferred iframe methods: `unMute is not a function`.
+- Volume selection now waits for player readiness; disposed source callbacks are ignored. A stage-scoped error boundary preserves room/chat/source controls on player initialization failures.
+- Phone work: explicit playback rows, larger tap targets, readable inputs without iOS focus zoom, safe-area spacing, compact header, responsive music and chat panels. Regression/mobile verification and production update in progress.
+- Build/type checks and all 51 unit tests pass. All nine browser workflows pass locally (including the new two-device deferred-SDK song-switch and mobile tests).
+- Actual old public deployment reproduced the same failure on its second YouTube revision, after the first decoded/played: evidence/song-switch-vercel-before.json records `unMute is not a function`.
+- Mobile screenshot inspection completed. Actual audio playback, manual sync and chat pass in two touch-emulated contexts; all 17 layout checks have no horizontal overflow. Physical phones/Safari are not available for verification.
+- Publishing the verified fix and phone layout; live playback verification/redeployment results to follow.

@@ -20,7 +20,8 @@
     "test:extension": "npm run build:extension && node scripts/verify-extension.mjs",
     "test:extension:browser": "npm run build:extension && playwright test -c playwright.extension.config.ts",
     "providers:check": "node scripts/check-providers.mjs",
-    "providers:youtube": "node scripts/check-youtube.mjs"
+    "providers:youtube": "node scripts/check-youtube.mjs",
+    "providers:switch": "node scripts/check-song-switch.mjs"
   },
   "dependencies": {
     "@vimeo/player": "^2.30.4",

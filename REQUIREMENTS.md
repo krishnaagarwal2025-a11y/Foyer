@@ -73,3 +73,10 @@ YouTube playback regression verification: `tests/browser/youtube.spec.ts` uses t
 - 51 unit tests and seven local browser workflows pass. Real two-process Redis evidence: `evidence/protocol-cross-instance.json`. Ten isolated browser contexts: `evidence/protocol-local-browser.json`. Extension ZIP/package checks pass; signed-in subscription playback remains unverified.
 
 Final public protocol verification: all seven public browser workflows passed. Ten isolated contexts measured 208.89ms p95 control-event delivery and 167.12ms maximum corrected drift. See PERFORMANCE.md for scheduled application latency and test limits. Interactive disclosures do not trigger global shortcuts; known provider errors cannot produce a false manual-sync success.
+
+## Song-switch and mobile regressions
+
+- `src/player/FoyerPlayer.tsx`: defer iframe volume operations until readiness and discard old source callbacks. `src/player/PlayerBoundary.tsx` / `src/main.tsx`: isolate player render/effect failures, recover on retry/revision and cancel previous-source sync feedback.
+- `tests/browser/youtube.spec.ts`: cached SDK with deliberately deferred mute methods reproduces `unMute is not a function` and a blank page before the fix. Four rapid distinct YouTube Music links, two contexts, mute during loading, discarded player callbacks and final playback/manual sync are checked after the fix.
+- `src/room.css` / `index.html`: explicit phone playback rows, 44px controls, 16px inputs, safe areas, compact header, music forms and responsive chat. `tests/browser/mobile.spec.ts`: real local audio reloads, play, guest sync and chat in two touch contexts, every sidebar view and source form at 320–430px, and landscape. Screenshot/JSON evidence is saved under `evidence/phone-*` and `evidence/mobile-verification-*.json`.
+- `scripts/check-song-switch.mjs` (`npm run providers:switch`): separate actual provider smoke test, capturing decoded playback state and uncaught errors across repeated YouTube mounts and direct-audio transitions. Its API-demo reuse and autoplay/mobile-emulation limitations are explicit in each JSON report.

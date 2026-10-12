@@ -280,7 +280,10 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
           },
           set muted(v) {
             isMuted = v;
-            volume(v);
+            // The cached YouTube SDK constructs the iframe synchronously, but
+            // mute/unMute are installed asynchronously at onReady. Retain the
+            // user's selection while loading and apply it once ready.
+            if (loaded && !disposed) volume(v);
           },
           playbackRate: 1,
           supportsRate: false,
@@ -303,12 +306,14 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
             );
         }, 20000);
         const onReady = () => {
+          if (disposed) return;
           loaded = true;
           clearTimeout(timeout);
           volume(isMuted);
           ready();
         };
         const completeSeek = () => {
+          if (disposed) return;
           seeking = false;
           if (!disposed) callbacks.current.onSeeked();
         };
@@ -361,6 +366,7 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
               playerVars: { playsinline: 1, origin: location.origin, rel: 0 },
               events: {
                 onReady: () => {
+                  if (disposed) return;
                   duration = player.getDuration() || m.duration;
                   onReady();
                 },
