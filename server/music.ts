@@ -7,10 +7,12 @@ import {
 } from "node:crypto";
 import { Readable } from "node:stream";
 import { z } from "zod";
-import type { Engine } from "./engine";
-import type { Movie } from "../shared/types";
+import type { Engine } from "./engine.js";
+import type { Movie } from "../shared/types.js";
 const safeId = z.string().regex(/^[A-Za-z0-9_-]{1,80}$/),
-  signingKey = randomBytes(32);
+  signingKey = process.env.FOYER_STREAM_SECRET
+    ? createHash("sha256").update(process.env.FOYER_STREAM_SECRET).digest()
+    : randomBytes(32);
 const endpoint = "https://api.audius.co/v1";
 const enabled = () =>
   Boolean(
@@ -51,7 +53,11 @@ function navURL(method: string, extra: Record<string, string>) {
   }).toString();
   return base;
 }
-export function mountMusic(app: Express, engine: Engine) {
+export function mountMusic(
+  app: Express,
+  engine: Engine,
+  remember?: (movies: Movie[]) => Promise<void>,
+) {
   const cache = new Map<string, { expires: number; movies: Movie[] }>();
   app.get("/api/providers", (_req, res) =>
     res.json({
@@ -73,23 +79,19 @@ export function mountMusic(app: Express, engine: Engine) {
       })
       .safeParse(req.query);
     if (!parsed.success) {
-      res
-        .status(400)
-        .json({
-          error:
-            "Choose a music provider and a search of at most 100 characters.",
-        });
+      res.status(400).json({
+        error:
+          "Choose a music provider and a search of at most 100 characters.",
+      });
       return;
     }
     const { provider, q } = parsed.data;
     if (provider === "navidrome" && (!enabled() || !authorized(req))) {
-      res
-        .status(enabled() ? 403 : 503)
-        .json({
-          error: enabled()
-            ? "Enter the private library access code."
-            : "Navidrome is not configured. Use Audius or local audio.",
-        });
+      res.status(enabled() ? 403 : 503).json({
+        error: enabled()
+          ? "Enter the private library access code."
+          : "Navidrome is not configured. Use Audius or local audio.",
+      });
       return;
     }
     const cacheKey = `${provider}:${q}`,
@@ -192,18 +194,17 @@ export function mountMusic(app: Express, engine: Engine) {
       for (const movie of movies) engine.library.set(movie.id, movie);
       while (engine.library.size > 500)
         engine.library.delete(engine.library.keys().next().value!);
+      if (remember) await remember(movies);
       cache.set(cacheKey, { movies, expires: Date.now() + 300000 });
       if (cache.size > 100) cache.delete(cache.keys().next().value!);
       res.json(movies);
     } catch (error) {
-      res
-        .status(502)
-        .json({
-          error:
-            error instanceof Error
-              ? error.message
-              : "Music provider unavailable.",
-        });
+      res.status(502).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Music provider unavailable.",
+      });
     }
   });
   app.post("/api/music/ticket/:id", (req, res) => {

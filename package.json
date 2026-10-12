@@ -3,9 +3,12 @@
   "version": "2.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "npm run build:extension && concurrently -k \"tsx watch server/index.ts\" \"vite --host 0.0.0.0\"",
-    "build": "tsc --noEmit && vite build && node scripts/build-extension.mjs",
+    "build": "tsc --noEmit && node scripts/build-extension.mjs && vite build",
     "start": "node --import tsx server/index.ts",
     "test": "vitest run",
     "test:browser": "playwright test",
@@ -26,6 +29,7 @@
     "fuse.js": "^7.1.0",
     "helmet": "^8.3.0",
     "hls.js": "^1.7.3",
+    "ioredis": "^6.0.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "socket.io": "^4.8.1",

@@ -20,7 +20,7 @@ npm run build
 npm start
 ```
 
-Open <http://localhost:3001>. For a local-network demonstration, run the production-style server on a machine reachable by your viewers and use `http://SERVER_LAN_IP:3001` from each device. Allow port 3001 in the local firewall. This is a single-process demonstration deployment; public use needs a stable HTTPS host, persistent disk, reverse proxy and appropriate operating controls. Foyer does not require any paid hosting provider.
+Open <http://localhost:3001>. For a local-network demonstration, run the production-style server on a machine reachable by your viewers and use `http://SERVER_LAN_IP:3001` from each device. Allow port 3001 in the local firewall. The public demo is https://foyer-cyan.vercel.app. See DEPLOYMENT.md for the Vercel WebSocket and shared Redis deployment; local startup remains a single-process SQLite deployment.
 
 ## Watch video and external services
 
@@ -41,7 +41,7 @@ Build the extension with `npm run build` (or `npm run build:extension`). From th
 3. Open a Netflix watch, Prime Video title, or Hotstar/JioHotstar title you can already watch. Open the extension popup, enter the Foyer server origin, and click **Allow server + this site**. The browser asks for permission to that Foyer server; the service tab access is limited to the supported streaming sites.
 4. Reload the title page and open the **Foyer** panel. Create a room or enter its code. The host can bind the current title; each other viewer opens that same title in their own signed-in tab and joins the room.
 
-The included ZIP is a developer-install package; Foyer has not been published to the Chrome Web Store. Chrome's documented distribution rules require a Web Store listing for normal end-user installation outside managed environments. For the initial build there is no Web Store publisher authorization or stable HTTPS product deployment configured.
+The included ZIP is a developer-install package; Foyer has not been published to the Chrome Web Store. Chrome's documented distribution rules require a Web Store listing for normal end-user installation outside managed environments. For the initial build there is no Web Store publisher authorization configured for store distribution.
 
 The extension reads the service page's title URL and document title and controls an accessible HTML video element when the service exposes one. It never reads login forms, cookies, credentials, protected stream URLs or DRM keys. Ad and buffering behavior is not modified. A host can pause for an ad (or choose the manual fallback) and resume when everyone's player is ready. Some protected player releases may reject control or make the player inaccessible; the panel explains the failure, and the viewer can still use the service's normal controls. Browser tests cover the extension loading and secure setup panel on a service-shaped test page, **not** subscription playback on personal accounts.
 
@@ -116,3 +116,6 @@ Resource bounds: 32 people and 500 rooms; 100 recent chat messages, 50 queued it
 ## Latest playback and layout fixes
 
 Discovery now sits in the right sidebar, while **Add a link to the room** is directly below the player. The provider player keeps its full width and recovery feedback below it. `tests/browser/youtube.spec.ts` uses a deterministic asynchronous IFrame API fixture to verify two-client buffering, host native controls, feedback-loop prevention, autoplay recovery, retry and YouTube Music queue/Listen behavior. This fixture is separate from `npm run providers:youtube`, which checks actual network playback of the official YouTube API demo and saves `evidence/youtube-live.json`. Override `YOUTUBE_TEST_URL` to check another publicly embeddable video; its availability is controlled by YouTube. Latest checks passed: 35 unit/protocol tests and 4 browser workflows. Production source maps are optional (`FOYER_SOURCEMAPS=1` when building).
+
+
+Cloud deployment externalizes authority to Redis: per-room fenced transactions preserve versions and deduplication across function instances, and Pub/Sub delivers committed snapshots. See [DEPLOYMENT.md](DEPLOYMENT.md) for retention, presence leases and deployment limits.

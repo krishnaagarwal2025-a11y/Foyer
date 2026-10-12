@@ -1,4 +1,4 @@
-import type { Movie } from "../shared/types";
+import type { Movie } from "../shared/types.js";
 const titles = [
   "Neon Afterglow",
   "The Quiet Orbit",

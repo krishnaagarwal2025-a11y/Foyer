@@ -132,6 +132,8 @@ function App() {
         (timeout: Error | null, result: Result) => {
           setJoining(false);
           if (timeout || !result?.ok) {
+            if (target && result?.error?.startsWith("Resume identity expired"))
+              sessionStorage.removeItem(`identity:${target}`);
             setError(
               timeout
                 ? "Server did not respond. Try again."
@@ -147,7 +149,7 @@ function App() {
             JSON.stringify(result.identity),
           );
           resume.current = { code: r.code, name: name.trim() };
-          setRoom(r);
+          setRoom((previous) => accept(previous, r));
           setCode(r.code);
           history.replaceState(null, "", `?room=${r.code}`);
         },
@@ -161,12 +163,14 @@ function App() {
       .then(setCatalog)
       .catch(() => setError("Catalog unavailable. Check the server."));
     const s = io({
+      transports: ["websocket"],
       reconnection: true,
       reconnectionDelay: 500,
       reconnectionDelayMax: 2000,
     });
     socket.current = s;
     let pingCount = 0;
+    let resumeTimer: ReturnType<typeof setTimeout> | undefined;
     const samples: { rtt: number; offset: number }[] = [];
     const ping = () => {
       if (!s.connected) return;
@@ -202,24 +206,63 @@ function App() {
       ping();
       const target = resume.current;
       if (target) {
-        const identity = JSON.parse(
+        clearTimeout(resumeTimer);
+        let identity = JSON.parse(
           sessionStorage.getItem(`identity:${target.code}`) || "null",
         );
-        s.timeout(5000).emit(
-          "join",
-          { ...target, identity },
-          (err: Error | null, result: Result) => {
-            if (err || !result?.ok) {
-              setError(result?.error || "Reconnect failed. Reload to rejoin.");
-              setStatus("Resume failed");
-              return;
-            }
-            setRoom((previous) => accept(previous, result.room!));
-            setSelf(result.identity!.id);
-            syncRef.current();
-          },
-        );
+        const reconnect = (attempt = 0) => {
+          if (!s.connected) return;
+          s.timeout(5000).emit(
+            "join",
+            { ...target, identity },
+            (err: Error | null, result: Result) => {
+              if (
+                !err &&
+                result?.error?.startsWith("Resume pending") &&
+                attempt < 65
+              ) {
+                setStatus("Reconnecting");
+                resumeTimer = setTimeout(() => reconnect(attempt + 1), 500);
+                return;
+              }
+              if (
+                !err &&
+                result?.error?.startsWith("Resume identity expired") &&
+                identity
+              ) {
+                sessionStorage.removeItem(`identity:${target.code}`);
+                identity = undefined;
+                reconnect(attempt + 1);
+                return;
+              }
+              if (err || !result?.ok) {
+                setError(
+                  result?.error || "Reconnect failed. Reload to rejoin.",
+                );
+                setStatus("Resume failed");
+                return;
+              }
+              sessionStorage.setItem(
+                `identity:${target.code}`,
+                JSON.stringify(result.identity),
+              );
+              setStatus("Connected");
+              setError("");
+              setRoom((previous) => accept(previous, result.room!));
+              setSelf(result.identity!.id);
+              syncRef.current();
+            },
+          );
+        };
+        reconnect();
       }
+    });
+    s.on("closed", () => {
+      resume.current = null;
+      setRoom(null);
+      setCode("");
+      setError("This room expired. Create a new room to continue.");
+      history.replaceState(null, "", "/");
     });
     s.on("disconnect", () => setStatus("Reconnecting"));
     s.on("connect_error", () => setStatus("Reconnecting"));
@@ -250,6 +293,7 @@ function App() {
     }, 1000);
     return () => {
       clearInterval(timer);
+      clearTimeout(resumeTimer);
       s.disconnect();
     };
   }, []);

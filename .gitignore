@@ -157,3 +157,10 @@ public/extension/*.zip
 public/extension/manifest.json
 public/extension/popup.html
 extension-test-profile/
+.vercel
+.env*
+!.env.example
+
+# Marketplace-generated agent guides
+.agents/
+skills-lock.json

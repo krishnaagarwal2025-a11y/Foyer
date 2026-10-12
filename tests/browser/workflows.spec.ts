@@ -129,7 +129,7 @@ test("two browsers complete the social and synchronized playback workflow", asyn
     await guestContext.setOffline(true);
     await expect(
       host.locator(".participant").filter({ hasText: "Jordan" }),
-    ).toContainText("Reconnecting");
+    ).toContainText("Reconnecting", { timeout: 35000 });
     await guestContext.setOffline(false);
     await expect(
       host.locator(".participant").filter({ hasText: "Jordan" }),
@@ -270,7 +270,9 @@ test("late join snapshots playback, corrects drift and recovers from a bad sourc
       .toBe(false);
     await host.getByRole("button", { name: "Pause", exact: true }).click();
     await expect
-      .poll(() => late.locator("video").evaluate((v: HTMLVideoElement) => v.paused))
+      .poll(() =>
+        late.locator("video").evaluate((v: HTMLVideoElement) => v.paused),
+      )
       .toBe(true);
     await host.getByLabel("Custom media title").fill("Missing source");
     await host

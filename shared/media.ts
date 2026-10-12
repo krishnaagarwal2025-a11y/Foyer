@@ -1,4 +1,4 @@
-import type { Movie } from "./types";
+import type { Movie } from "./types.js";
 export const externalProviders = ["netflix", "prime", "hotstar"];
 export function isPlayable(movie: Movie) {
   return Boolean(movie.url || movie.sourceId);

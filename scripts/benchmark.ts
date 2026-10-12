@@ -85,7 +85,7 @@ try {
     commands: iterations,
     warmupCommands: 9,
     method:
-      "One Node monotonic clock. Start immediately before host emit; end in each recipient state callback. Includes server validation, SQLite checkpoint and broadcast. Recipients exclude sender.",
+      "One Node monotonic clock. Start immediately before host emit; end in each recipient state callback. Includes server validation, durable checkpoint and broadcast. Recipients exclude sender.",
     environment: {
       os: os.type() + " " + os.release(),
       node: process.version,
@@ -100,7 +100,7 @@ try {
   };
   mkdirSync("evidence", { recursive: true });
   writeFileSync(
-    "evidence/socket-benchmark.json",
+    process.env.BENCH_REPORT || "evidence/socket-benchmark.json",
     JSON.stringify(report, null, 2),
   );
   console.log(JSON.stringify(report, null, 2));

@@ -1,4 +1,4 @@
-import type { Room } from "./types";
+import type { Room } from "./types.js";
 export const acceptSnapshot = (previous: Room | null, next: Room) =>
   !previous || previous.code !== next.code || next.version > previous.version
     ? next

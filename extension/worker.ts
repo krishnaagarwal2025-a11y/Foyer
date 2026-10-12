@@ -9,6 +9,7 @@ type Connection = {
   identity?: { id: string; token: string };
   offset: number;
   samples: { rtt: number; offset: number }[];
+  resumeTimer?: ReturnType<typeof setTimeout>;
 };
 const connections = new Map<number, Connection>();
 const send = (tab: number, message: unknown) => {
@@ -28,8 +29,10 @@ function validServer(value: string) {
 function validIdentity(value: unknown): Connection["identity"] {
   if (!value || typeof value !== "object") return undefined;
   const candidate = value as Record<string, unknown>;
-  return typeof candidate.id === "string" && candidate.id.length <= 80 &&
-    typeof candidate.token === "string" && candidate.token.length >= 32 &&
+  return typeof candidate.id === "string" &&
+    candidate.id.length <= 80 &&
+    typeof candidate.token === "string" &&
+    candidate.token.length >= 32 &&
     candidate.token.length <= 128
     ? { id: candidate.id, token: candidate.token }
     : undefined;
@@ -39,6 +42,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   const tab = sender.tab?.id;
   if (tab === undefined) return;
   if (message.type === "foyer:disconnect") {
+    clearTimeout(connections.get(tab)?.resumeTimer);
     connections.get(tab)?.socket.disconnect();
     connections.delete(tab);
     respond({ ok: true });
@@ -143,9 +147,10 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         send(tab, { type: "foyer:status", status: "Resuming" });
         const creatingRoom = !c.code;
         ping();
-        socket
-          .timeout(5000)
-          .emit(
+        clearTimeout(c.resumeTimer);
+        const resumeJoin = (attempt = 0) => {
+          if (!socket.connected) return;
+          socket.timeout(5000).emit(
             "join",
             {
               name: c.name,
@@ -153,6 +158,26 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
               ...(c.identity ? { identity: c.identity } : {}),
             },
             (error: Error | null, result: Result) => {
+              if (
+                !error &&
+                result?.error?.startsWith("Resume pending") &&
+                attempt < 65
+              ) {
+                c.resumeTimer = setTimeout(() => resumeJoin(attempt + 1), 500);
+                return;
+              }
+              if (
+                !error &&
+                result?.error?.startsWith("Resume identity expired") &&
+                c.identity
+              ) {
+                c.identity = undefined;
+                void chrome.storage.local.remove(
+                  `identity:${server}:${tab}:${c.code}`,
+                );
+                resumeJoin(attempt + 1);
+                return;
+              }
               if (error || !result?.ok) {
                 send(tab, {
                   type: "foyer:error",
@@ -177,6 +202,15 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
               send(tab, { type: "foyer:status", status: "Connected" });
             },
           );
+        };
+        resumeJoin();
+      });
+      socket.on("closed", () => {
+        send(tab, {
+          type: "foyer:error",
+          error: "This room expired. Create a new room.",
+        });
+        send(tab, { type: "foyer:status", status: "Room closed" });
       });
       socket.on("state", (room: Room) =>
         send(tab, { type: "foyer:state", room }),
@@ -210,6 +244,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   return true;
 });
 chrome.tabs.onRemoved.addListener((tab) => {
+  clearTimeout(connections.get(tab)?.resumeTimer);
   connections.get(tab)?.socket.disconnect();
   connections.delete(tab);
 });

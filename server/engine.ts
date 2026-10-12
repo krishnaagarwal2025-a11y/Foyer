@@ -1,17 +1,17 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
-import { catalog } from "./catalog";
+import { catalog } from "./catalog.js";
 import {
   normalizeSource,
   isPlayable,
   isListeningSource,
-} from "../shared/media";
+} from "../shared/media.js";
 import {
   expectedPosition,
   type Room,
   type Result,
   type Movie,
-} from "../shared/types";
+} from "../shared/types.js";
 const name = z.string().trim().min(1).max(32);
 const id = z.string().min(1).max(80);
 const genre = z.enum([
@@ -267,8 +267,9 @@ export class Engine {
       this.commit(r);
     }
   }
-  sweep() {
+  sweep(code?: string) {
     for (const r of this.rooms.values()) {
+      if (code && r.code !== code) continue;
       const expired = r.participants.filter(
         (p) =>
           !p.connected && (this.deadlines.get(p.id) || Infinity) <= this.now(),

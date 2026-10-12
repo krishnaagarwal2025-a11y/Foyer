@@ -280,7 +280,7 @@ try {
       loadAverage: os.loadavg(),
     },
     limitations:
-      "Localhost only, shared machine. Autoplay allowed by test flag and audio muted. Background throttling disabled. Player application criterion is state/timeline, not frame presentation timestamp. Clock calibration uncertainty approximately half calibration RTT. Windows load average does not reflect CPU load.",
+      "All clients share one measurement machine; deployment URL identifies loopback versus public hosting. Autoplay allowed by test flag and audio muted. Background throttling disabled. Player application criterion is state/timeline, not frame presentation timestamp. Clock calibration uncertainty approximately half calibration RTT. Windows load average does not reflect CPU load.",
     passed:
       applySamples.length === iterations * (count - 1) &&
       eventSamples.length === iterations * (count - 1) &&
@@ -290,7 +290,7 @@ try {
   };
   mkdirSync("evidence", { recursive: true });
   writeFileSync(
-    "evidence/browser-benchmark.json",
+    process.env.BENCH_REPORT || "evidence/browser-benchmark.json",
     JSON.stringify(report, null, 2),
   );
   console.log(JSON.stringify(report, null, 2));

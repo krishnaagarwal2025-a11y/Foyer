@@ -1,6 +1,6 @@
 # Measured performance
 
-Final runs: **12 October 2026, Asia/Calcutta**. Raw JSON retains UTC timestamps. All measurements below are **localhost/loopback on one machine**, not a physical LAN or an internet deployment.
+Final runs: **12 October 2026, Asia/Calcutta**. Raw JSON retains UTC timestamps. The first table records **localhost/loopback on one machine**. A separate public Vercel run is recorded below; neither is a physical LAN test.
 
 | Measurement | Samples | p50 | p95 | Maximum |
 |---|---:|---:|---:|---:|
@@ -84,3 +84,18 @@ Disconnection grace is 15 seconds; host replacement is deterministic after expir
 ## Provider playback follow-up
 
 The YouTube repair was verified separately on 12 October 2026: `npm run providers:youtube` loaded and played the official API demo (`M7lc1UVf-VE`), observed 38 matching player-state samples and progression to 5.1 seconds, and retained no error/buffering feedback. `evidence/youtube-live.json` and its screenshot preserve the actual result. The embedded HTML5 video was also observed playing at readyState 4, with decoded size 854×480 and rendered size 808×454. This one-page smoke check used autoplay-enabled Chromium and does not certify every video, account, network, player or multi-user YouTube timing. Four automated browser workflows passed, including a two-context asynchronous YouTube API fixture. The ten-user figures above were refreshed after the playback correction changes using the local MP4; third-party playback remains excluded from those numbers.
+
+## Public Vercel verification
+
+URL: https://foyer-cyan.vercel.app. Ten clients ran on the Windows machine above, connecting over the Internet to the Mumbai function and free Mumbai Upstash database. This is not a physical LAN test. All four browser workflow tests passed against this URL; 44 unit tests pass. Real Redis coordination was separately verified with two explicitly separate local backend processes; public Vercel instance placement cannot be observed by this test.
+
+| Measurement | Samples | p50 | p95 | Maximum |
+|---|---:|---:|---:|---:|
+| Ten socket clients: control delivery | 810 | 78.29 ms | 105.55 ms | 241.17 ms |
+| Ten isolated browser contexts: event delivery | 270 | 49.10 ms | 70.79 ms | 106.60 ms |
+| Ten isolated browser contexts: player application | 270 | 67.19 ms | 170.95 ms | 182.49 ms |
+| Ten isolated browser contexts: corrected drift | 300 | 60.08 ms | 107.46 ms | 126.65 ms |
+
+Raw evidence: `evidence/vercel-socket-benchmark.json`, `evidence/vercel-browser-benchmark.json`, `evidence/vercel-check.json`, `evidence/cloud-check.json`. No missing browser samples or workflow failures were recorded. Video playback used the included demo MP4 served by Vercel; browser autoplay was allowed and audio muted. Browser throttling was disabled. Clock calibration maximum RTT was 2.70 ms. Windows memory pressure was present during the run; unrelated tool launches exhausted commit memory, but all ten contexts completed and reported actual samples. Windows load average is not a CPU measurement. These results do not establish all-device or third-party-media performance, or verify natural 300-second function rotation. Explicit reconnect and cross-process identity recovery were tested; expired-worker lease/election behavior is covered by cloud unit tests.
+
+Repeat using BENCH_URL or DEMO_URL set to the production URL, with BENCH_REPORT selecting a separate evidence file. The deployment is described in DEPLOYMENT.md.

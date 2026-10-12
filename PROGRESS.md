@@ -39,3 +39,13 @@
 - Listen accepts individual YouTube/YouTube Music songs with the full visible video; music search opens the provider website, then users paste and queue share links. No scraping or audio extraction.
 - Build/type checks, 35 unit/protocol tests, four browser workflows, real YouTube smoke playback and refreshed ten-user socket/browser benchmarks passed. Latest browser delivery p95 10.53 ms, application p95 122.44 ms, corrected drift maximum 74.53 ms. Socket delivery p95 6.95 ms. These are localhost results; YouTube smoke playback is separate.
 - Production demo is running at http://localhost:3001. Build retries encountered Windows allocation limits; checks were serialized, source maps made opt-in, and the successful build used a 512 MiB Node heap with one Rayon thread.
+
+## Vercel deployment
+- Provisioned free Upstash Redis, paid auto-upgrade disabled, Mumbai region.
+- Added fenced room transactions, Redis Pub/Sub and cross-instance resume handling.
+- 44 unit tests pass; real two-server Redis check passes six core assertions (evidence/cloud-check.json).
+- Public deployment verification in progress; API catch-all corrected after first deployment route failure.
+
+- Production verified: https://foyer-cyan.vercel.app, health shared-redis, catalog/help/media/extension all HTTP 200.
+- All four browser workflows pass locally and publicly; 10 isolated browser contexts pass public performance targets (see PERFORMANCE.md).
+- Local SQLite demo restarted at http://localhost:3001; temporary cloud servers stopped.

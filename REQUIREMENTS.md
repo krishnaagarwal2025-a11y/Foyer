@@ -48,3 +48,10 @@ No unfinished bonus controls are exposed. External media codecs/network availabi
 The companion follows service pages through each viewer's own authorized account. It does not embed or relay subscription video and does not access credentials, cookies or DRM material. Audius is an artist-published catalog, not an all-songs source; Navidrome serves a library supplied by the operator.
 
 YouTube playback regression verification: `tests/browser/youtube.spec.ts` uses two independent browser contexts and an asynchronous IFrame API fixture (not a real stream), checking buffering settlement, native host controls, no correction feedback, autoplay recovery, iframe recreation on retry, and song queue/Listen propagation. `evidence/youtube-live.json` separately records successful actual YouTube API demo playback on localhost. Discovery/sidebar and full-width iframe bounds are asserted in the browser fixture.
+
+## Public Vercel deployment
+- Production URL: https://foyer-cyan.vercel.app.
+- api/foyer.ts and vercel.json route the frontend, HTTP API and WebSocket upgrades.
+- server/cloud.ts and server/redis-store.ts provide distributed serialization, committed Pub/Sub, leases and token-bound resumes. Nine additional cloud unit tests pass (44 total).
+- Real two-process Redis tests: evidence/cloud-check.json; public protocol tests: evidence/vercel-check.json (public instance placement is not observable).
+- Public browser suite: all four workflows pass. Deployment constraints and manual redeploy instructions are in DEPLOYMENT.md.

@@ -10,7 +10,16 @@
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
     "noEmit": true,
-    "types": ["node","chrome"]
+    "types": ["node", "chrome"]
   },
-  "include": ["src", "server", "shared", "scripts", "tests", "extension", "*.ts"]
+  "include": [
+    "api",
+    "src",
+    "server",
+    "shared",
+    "scripts",
+    "tests",
+    "extension",
+    "*.ts"
+  ]
 }
