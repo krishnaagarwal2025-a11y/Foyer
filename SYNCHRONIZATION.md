@@ -1,6 +1,6 @@
 # Foyer device-check synchronization protocol
 
-Foyer measures both devices through the server. Three check exchanges run for each currently connected participant before a Play request, a queued winner, automatic advancement, and manual sync. This works for direct audio/video and supported provider players. The companion bridges the same packets to its service tab.
+Foyer measures both devices through the server. Three check exchanges run concurrently for each currently connected participant before a Play request, a queued winner, automatic advancement, and manual sync. This works for direct audio/video and supported provider players. The companion bridges the same packets to its service tab.
 
 ```mermaid
 sequenceDiagram

@@ -18,9 +18,8 @@ const reply = z.object({
   ready: z.boolean(),
   autoplayBlocked: z.boolean(),
 });
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Per-device, three-exchange preflight. Redis Pub/Sub distributes the request
+/** Per-device, three concurrent exchanges. Redis Pub/Sub distributes the request
  * and trusted server-measured reports; client timestamps only remove processing
  * time and calibrate offset. Missing peers never block a room indefinitely. */
 export class SyncProtocol {
@@ -151,57 +150,59 @@ export class SyncProtocol {
     participantId: string,
     job: SyncProbe,
   ): Promise<SyncMeasurement> {
-    let fastest = Infinity,
-      samples = 0,
-      ready = false,
-      autoplayBlocked = false;
-    for (let sequence = 0; sequence < 3; sequence++) {
-      if (!socket.connected || this.now() > job.expiresAt) break;
-      const serverSentAt = this.now(),
-        started = performance.now();
-      try {
-        const response = reply.safeParse(
-          await socket
-            .timeout(300)
-            .emitWithAck("sync-check", { ...job, sequence, serverSentAt }),
-        );
-        const serverReceivedAt = this.now(),
-          elapsed = performance.now() - started;
-        if (!response.success) break;
-        const data = response.data,
-          processing = data.clientSentAt - data.clientReceivedAt;
-        if (
-          data.id !== job.id ||
-          data.sequence !== sequence ||
-          processing < 0 ||
-          processing > elapsed + 2
-        )
-          break;
-        const rttMs = Math.max(0, elapsed - processing);
-        samples++;
-        fastest = Math.min(fastest, rttMs);
-        ready = data.mediaRevision === job.mediaRevision && data.ready;
-        autoplayBlocked = data.autoplayBlocked;
-        socket.emit("sync-clock", {
-          id: job.id,
-          serverSentAt,
-          serverReceivedAt,
-          clientReceivedAt: data.clientReceivedAt,
-          clientSentAt: data.clientSentAt,
-          rttMs,
-        });
-        // A brief gap samples jitter and gives a newly selected player time to load.
-        if (sequence < 2) await sleep(15);
-      } catch {
-        break;
-      }
-    }
+    const results = await Promise.all(
+      [0, 1, 2].map(async (sequence) => {
+        if (!socket.connected || this.now() > job.expiresAt) return null;
+        const serverSentAt = this.now(),
+          started = performance.now();
+        try {
+          const response = reply.safeParse(
+            await socket
+              .timeout(300)
+              .emitWithAck("sync-check", { ...job, sequence, serverSentAt }),
+          );
+          const serverReceivedAt = this.now(),
+            elapsed = performance.now() - started;
+          if (!response.success) return null;
+          const data = response.data,
+            processing = data.clientSentAt - data.clientReceivedAt;
+          if (
+            data.id !== job.id ||
+            data.sequence !== sequence ||
+            processing < 0 ||
+            processing > elapsed + 2
+          )
+            return null;
+          const rttMs = Math.max(0, elapsed - processing);
+          socket.emit("sync-clock", {
+            id: job.id,
+            serverSentAt,
+            serverReceivedAt,
+            clientReceivedAt: data.clientReceivedAt,
+            clientSentAt: data.clientSentAt,
+            rttMs,
+          });
+          return {
+            rttMs,
+            sentAt: data.clientSentAt,
+            ready: data.mediaRevision === job.mediaRevision && data.ready,
+            autoplayBlocked: data.autoplayBlocked,
+          };
+        } catch {
+          return null;
+        }
+      }),
+    );
+    const valid = results
+      .filter((v) => v !== null)
+      .sort((a, b) => a.sentAt - b.sentAt);
+    const latest = valid.at(-1);
     return {
       participantId,
-      rttMs: samples ? fastest : null,
-      samples,
-      ready,
-      autoplayBlocked,
+      rttMs: valid.length ? Math.min(...valid.map((v) => v.rttMs)) : null,
+      samples: valid.length,
+      ready: latest?.ready ?? false,
+      autoplayBlocked: latest?.autoplayBlocked ?? false,
     };
   }
 }

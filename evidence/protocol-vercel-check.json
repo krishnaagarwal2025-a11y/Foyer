@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-10-12T16:48:04.330Z",
+  "urls": [
+    "https://foyer-cyan.vercel.app",
+    "https://foyer-cyan.vercel.app"
+  ],
+  "separateServerEndpoints": false,
+  "limitation": "Public function instance placement not observable",
+  "playbackLimit": "Socket-only clients report synthetic readiness; this is a protocol test, not a video playback test.",
+  "checks": [
+    "room join",
+    "Redis Pub/Sub seek delivery",
+    "playing late join",
+    "unauthorized control rejected",
+    "duplicate operation deduplicated",
+    "stable identity reconnect",
+    "fresh guest sync snapshot and invalid/unauthenticated sync rejection",
+    "three measured check exchanges across every room participant"
+  ],
+  "passed": true
+}

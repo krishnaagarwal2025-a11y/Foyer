@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-12T16:38:06.093Z",
+  "timestamp": "2026-10-12T17:00:18.616Z",
   "url": "http://localhost:3001",
   "participants": 10,
   "browser": "156.0.8078.4",
@@ -16,71 +16,71 @@
   "method": "Start: actual host command dispatch in app. Delivery: recipient Socket.IO state handler. Applied: first non-seeking video sample matching paused state and within 500ms of authoritative timeline, with a state version at least as new as the command. Browser clocks calibrated to a single Node monotonic clock using minimum RTT of 7 Playwright evaluations per page. Application sampled on command, playing/seeked/canplay events and each 100ms correction tick. Drift measured from HTML5 currentTime at least one second after each control; offset from app ping estimator via read-only clock telemetry.",
   "calibrationRoundTripMs": {
     "samples": 10,
-    "p50": 1.6905000000006112,
-    "p95": 2.483400000000074,
-    "maximum": 2.483400000000074
+    "p50": 2.386500000000524,
+    "p95": 3.407199999999648,
+    "maximum": 3.407199999999648
   },
   "eventDeliveryMs": {
     "samples": 270,
-    "p50": 7.837950002976868,
-    "p95": 83.57775000297988,
-    "maximum": 89.23795000148675
+    "p50": 10.992249995528255,
+    "p95": 54.37694999850646,
+    "maximum": 70.01514999999927
   },
   "playerApplicationMs": {
     "samples": 270,
-    "p50": 120.27775000223482,
-    "p95": 204.89415000074223,
-    "maximum": 210.97775000148977
+    "p50": 123.89224999776343,
+    "p95": 171.8372499992547,
+    "maximum": 268.59224999701837
   },
   "byControlType": {
     "play": {
       "deliveryMs": {
         "samples": 90,
-        "p50": 79.23285000148826,
-        "p95": 84.0561999992533,
-        "maximum": 89.23795000148675
+        "p50": 48.095399997764616,
+        "p95": 61.157049999252195,
+        "maximum": 70.01514999999927
       },
       "applicationMs": {
         "samples": 90,
-        "p50": 198.57775000297988,
-        "p95": 207.35720000223228,
-        "maximum": 210.97775000148977
+        "p50": 160.64959999926214,
+        "p95": 180.34960000224237,
+        "maximum": 268.59224999701837
       }
     },
     "pause": {
       "deliveryMs": {
         "samples": 90,
-        "p50": 7.555000002983434,
-        "p95": 12.93285000074684,
-        "maximum": 17.537549999258772
+        "p50": 10.134399997768924,
+        "p95": 15.957049999997253,
+        "maximum": 18.67694999925152
       },
       "applicationMs": {
         "samples": 90,
-        "p50": 120.27775000223482,
-        "p95": 128.83755000372548,
-        "maximum": 132.83755000000383
+        "p50": 123.89224999776343,
+        "p95": 134.39539999850967,
+        "maximum": 142.6594000000041
       }
     },
     "seek": {
       "deliveryMs": {
         "samples": 90,
-        "p50": 6.537550002984062,
-        "p95": 7.994149998507055,
-        "maximum": 10.837949999251578
+        "p50": 10.095399997764616,
+        "p95": 27.59224999701837,
+        "maximum": 34.24960000074498
       },
       "applicationMs": {
         "samples": 90,
-        "p50": 27.337550000000192,
-        "p95": 38.72164999925735,
-        "maximum": 43.73795000148675
+        "p50": 42.99539999999979,
+        "p95": 81.37695000223175,
+        "maximum": 84.51515000000654
       }
     }
   },
   "absoluteDriftMs": {
     "samples": 300,
-    "p50": 39.37134570312395,
-    "p95": 54.51183203125076,
-    "maximum": 148.0029687499993
+    "p50": 34.55996484374779,
+    "p95": 90.09597460937613,
+    "maximum": 151.6499902343753
   },
   "missingDeliverySamples": 0,
   "missingApplicationSamples": 0,
@@ -91,7 +91,7 @@
     "cpu": "AMD Ryzen 5 5500U with Radeon Graphics         ",
     "logicalCpus": 12,
     "totalMemoryGB": 15.339912414550781,
-    "freeMemoryGB": 4.250102996826172,
+    "freeMemoryGB": 4.88531494140625,
     "loadAverage": [
       0,
       0,

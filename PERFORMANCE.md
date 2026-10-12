@@ -112,9 +112,11 @@ The handshake-enabled localhost run used 10 isolated Chromium contexts, three ac
 
 | Measurement | Samples | p50 | p95 | Maximum |
 |---|---:|---:|---:|---:|
-| Socket-only delivery including play preflight | 810 | 5.15 ms | 72.23 ms | 73.47 ms |
-| Browser event delivery including play preflight | 270 | 7.84 ms | 83.58 ms | 89.24 ms |
-| Browser player application, including scheduled wait | 270 | 120.28 ms | 204.89 ms | 210.98 ms |
-| Corrected absolute drift | 300 | 39.37 ms | 54.51 ms | 148.00 ms |
+| Socket-only delivery including play preflight | 810 | 5.89 ms | 23.46 ms | 39.10 ms |
+| Browser event delivery including play preflight | 270 | 10.99 ms | 54.38 ms | 70.02 ms |
+| Browser player application, including scheduled wait | 270 | 123.89 ms | 171.84 ms | 268.59 ms |
+| Corrected absolute drift | 300 | 34.56 ms | 90.10 ms | 151.65 ms |
 
 Raw reports: `evidence/protocol-local-socket.json` and `evidence/protocol-local-browser.json`. RTT-based offset assumes symmetric routes; it is an estimate. Loopback is not a physical LAN test. Real Redis coordination was separately verified with two backend processes; that report is protocol-only and uses synthetic readiness. See SYNCHRONIZATION.md for the bounded missing-device policy and scheduled-anchor algorithm. Public deployment results are kept in separate reports.
+
+The initial sequential public handshake missed the delivery target: socket p95 396.15 ms and browser p95 407.50 ms. Drift remained below 170 ms maximum. Those failed delivery runs are preserved as `protocol-vercel-sequential-socket.json` and `protocol-vercel-sequential-browser.json`. The final protocol issues the three timestamped exchanges concurrently to avoid accumulating three network waits. The local table above is the optimized rerun; public optimized results are recorded separately. Source readiness is reported by the client/player API; the server measures RTT and validates membership. Provider-native buffering may begin on playback even after API readiness.

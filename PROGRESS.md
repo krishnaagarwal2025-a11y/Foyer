@@ -86,3 +86,7 @@ Protocol final local verification:
 - Ten-context local browser protocol benchmark passes: delivery p95 83.58ms, application p95 204.89ms, maximum corrected drift 148ms.
 - Extension packaging passes; cloud temporary servers stopped; local server remains running.
 - Publishing source and final public verification next.
+
+- Public sequential preflight socket run missed target: p95 396.15ms (preserved as protocol-vercel-sequential-socket.json). Optimizing three exchanges to run concurrently, preserving independent timestamps, fastest RTT, and most recent readiness. Rerun pending.
+
+- Concurrent exchange optimization passes 51 unit tests; all seven local workflows verified (one transient screenshot write failure passed on targeted retry). Local optimized socket p95 23.46ms; ten-browser delivery p95 54.38ms, application p95 171.84ms, max drift 151.65ms. Publishing optimization for public rerun.
