@@ -2,7 +2,7 @@
 
 ## Foyer provider launch work — 12 October 2026
 
-- Rechecked the remote (`origin/main` remains the initial repository commit); implementation is committed and published on `feat/foyer-streaming-launch` when push succeeds.
+- Rechecked the remote (`origin/main` remains the initial repository commit); commit `c4d1c7b` is pushed to `feat/foyer-streaming-launch`.
 - Fixed strict TypeScript errors in the companion extension, validated stored reconnect identities, preserved the external title across host reconnects, and prevented delayed native player events from echoing room corrections as new controls.
 - Added provider URL validation tests, a Chromium MV3 fixture workflow, an Audius network smoke command, CI checks and Foyer setup/support documentation.
 - A live Audius probe on this date returned a public searchable track and `audio/mpeg` stream HEAD response without an API key. `npm run providers:check` saves a repeatable result in `evidence/providers-live.json`.
@@ -10,6 +10,7 @@
 - Latest localhost benchmarks: 810 socket deliveries at 5.40 ms p95; 270 isolated-browser deliveries at 8.77 ms p95; 270 player applications at 29.87 ms p95; 300 post-correction drift samples at 61.34 ms maximum. See `PERFORMANCE.md` and raw reports.
 - Final verification: `npm test` (33 tests), `npm run build`, all 3 Playwright application workflows, extension package validation, and live Audius smoke check passed. The extension's Chromium fixture was skipped on this Windows host because its Playwright browser runtime cannot launch; the fixture remains in CI for Linux verification.
 - Full signed-in subscription playback, a Chrome Web Store listing and physical-LAN timings require authorized accounts, publisher access and a second network host that are not configured here. Platform adapters remain labeled experimental.
+- GitHub confirms the published branch at commit `c4d1c7b`; no Actions run appeared in the repository API after push, so CI status remains unverified here.
 - The current implementation checklist and exact unverified items are in `FOYER-PLAN.md`.
 
 - Empty workspace inspected; no parent or local AGENTS.md found.
