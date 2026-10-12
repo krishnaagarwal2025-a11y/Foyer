@@ -15,9 +15,12 @@ import {
   type Room,
   type Movie,
   type Result,
+  type Synchronization,
+  type SyncProbe,
+  type SyncClockPacket,
 } from "../shared/types";
 import { isListeningSource } from "../shared/media";
-import { acceptSnapshot as accept } from "../shared/sync";
+import { acceptSnapshot as accept, probeClockOffset } from "../shared/sync";
 import "./style.css";
 import "./provider.css";
 import "./room.css";
@@ -81,6 +84,9 @@ function App() {
     [blocked, setBlocked] = useState(false),
     [syncMessage, setSyncMessage] = useState(""),
     [syncing, setSyncing] = useState(false),
+    [preparingPlay, setPreparingPlay] = useState(false),
+    [protocolMessage, setProtocolMessage] = useState(""),
+    [lastCheck, setLastCheck] = useState<Synchronization | null>(null),
     [playerAttempt, setPlayerAttempt] = useState(0),
     [videoError, setVideoError] = useState(""),
     [position, setPosition] = useState(0),
@@ -158,6 +164,8 @@ function App() {
           manualSync.current = null;
           setSyncing(false);
           setSyncMessage("");
+          setProtocolMessage("");
+          setLastCheck(null);
           setSelf(result.identity!.id);
           sessionStorage.setItem("name", name.trim());
           sessionStorage.setItem(
@@ -187,6 +195,7 @@ function App() {
     socket.current = s;
     let pingCount = 0;
     let resumeTimer: ReturnType<typeof setTimeout> | undefined;
+    let lastProbe = "";
     const samples: { rtt: number; offset: number }[] = [];
     const ping = () => {
       if (!s.connected) return;
@@ -218,6 +227,8 @@ function App() {
       );
     };
     s.on("connect", () => {
+      samples.length = 0;
+      pingCount = 0;
       setStatus("Connected");
       ping();
       const target = resume.current;
@@ -277,6 +288,8 @@ function App() {
       manualSync.current = null;
       setSyncing(false);
       setSyncMessage("");
+      setProtocolMessage("");
+      setLastCheck(null);
       resume.current = null;
       setRoom(null);
       setCode("");
@@ -298,6 +311,81 @@ function App() {
         }),
       );
       setRoom((previous) => accept(previous, r));
+    });
+    s.on(
+      "sync-check",
+      (
+        packet: SyncProbe & { sequence: number; serverSentAt: number },
+        ack: (reply: unknown) => void,
+      ) => {
+        const clientReceivedAt = monotonic(),
+          r = latest.current,
+          v = video.current;
+        if (!r || packet.code !== r.code || typeof ack !== "function") return;
+        setProtocolMessage(
+          packet.reason === "play"
+            ? "Checking device delays before starting…"
+            : "Checking the room’s device delays…",
+        );
+        window.dispatchEvent(
+          new CustomEvent("watchparty:probe", { detail: packet }),
+        );
+        ack({
+          id: packet.id,
+          sequence: packet.sequence,
+          mediaRevision: r.mediaRevision,
+          clientReceivedAt,
+          clientSentAt: monotonic(),
+          ready:
+            packet.mediaRevision === r.mediaRevision &&
+            loadedRevision.current === r.mediaRevision &&
+            !!v &&
+            v.readyState >= 2 &&
+            v.seekable.length > 0 &&
+            !v.buffering &&
+            !v.seeking,
+          autoplayBlocked: blockedRef.current,
+        });
+      },
+    );
+    s.on("sync-clock", (packet: SyncClockPacket) => {
+      if (
+        ![
+          packet.rttMs,
+          packet.serverSentAt,
+          packet.serverReceivedAt,
+          packet.clientReceivedAt,
+          packet.clientSentAt,
+        ].every(Number.isFinite)
+      )
+        return;
+      if (lastProbe !== packet.id) {
+        lastProbe = packet.id;
+        samples.length = 0;
+      }
+      samples.push({ rtt: packet.rttMs, offset: probeClockOffset(packet) });
+      if (samples.length > 20) samples.shift();
+      const fastest = [...samples].sort((a, b) => a.rtt - b.rtt)[0];
+      offsetRef.current = fastest.offset;
+      setOffset(fastest.offset);
+      setRtt(packet.rttMs);
+      window.dispatchEvent(
+        new CustomEvent("watchparty:clock", {
+          detail: { offset: fastest.offset, rtt: packet.rttMs },
+        }),
+      );
+    });
+    s.on("sync-checked", (check: Synchronization) => {
+      if (
+        latest.current?.code !== check.code ||
+        latest.current.mediaRevision !== check.mediaRevision
+      )
+        return;
+      setLastCheck(check);
+      const ready = check.participants.filter((p) => p.ready).length;
+      setProtocolMessage(
+        `Delay check: ${ready}/${check.participants.length} sources ready${ready < check.participants.length ? " · waiting devices will catch up" : ""}.`,
+      );
     });
     s.on("reaction", (reaction) => {
       setReactions((old) => [...old.slice(-5), reaction]);
@@ -329,6 +417,10 @@ function App() {
         mediaRevision: r.mediaRevision,
         command: c,
       };
+      if (c.type === "play") {
+        setPreparingPlay(true);
+        setProtocolMessage("Checking device delays before starting…");
+      }
       window.dispatchEvent(
         new CustomEvent("watchparty:command", {
           detail: { ...envelope, time: performance.now() },
@@ -338,6 +430,7 @@ function App() {
         "command",
         envelope,
         (err: Error | null, result: Result) => {
+          if (c.type === "play") setPreparingPlay(false);
           if (err && !s.connected) {
             setError(
               "Connection lost before confirmation. Sync after reconnecting.",
@@ -356,8 +449,13 @@ function App() {
                 else setError("");
               },
             );
-          } else if (!result?.ok)
+          } else if (!result?.ok) {
             setError(result?.error || "Command rejected.");
+            if (c.type === "play")
+              setProtocolMessage(
+                "Device check or playback request failed. Check the room message and retry.",
+              );
+          }
         },
       );
     },
@@ -391,6 +489,18 @@ function App() {
       delta = expected - v.currentTime;
     setDrift(delta);
     setPosition(v.currentTime);
+    if (r.playing && monotonic() + offsetRef.current < r.anchor) {
+      // The authoritative start is in the future. Hold, rather than playing
+      // immediately on packet receipt and recreating inter-device latency.
+      if (!v.paused) v.pause();
+      v.playbackRate = 1;
+      if (!v.seeking && !v.buffering && Math.abs(delta) > 0.15) {
+        try {
+          v.currentTime = expected;
+        } catch {}
+      }
+      return;
+    }
     // Provider buffering/seeking is asynchronous; repeated seeks/play calls can
     // continually restart its download. Wait for the observed transition.
     if (v.buffering || v.seeking) return;
@@ -405,15 +515,26 @@ function App() {
             blockedRef.current = false;
             setBlocked(false);
           })
-          .catch(() => {
+          .catch((failure: unknown) => {
             if (video.current !== v) return;
-            blockedRef.current = true;
-            setBlocked(true);
+            const message =
+              failure instanceof Error
+                ? failure.message
+                : "Playback could not start.";
+            const needsClick =
+              (failure instanceof Error &&
+                failure.name === "NotAllowedError") ||
+              /autoplay|blocked|did not start/i.test(message);
+            blockedRef.current = needsClick;
+            setBlocked(needsClick);
+            if (!needsClick) setVideoError(message);
             if (manualSync.current) {
               manualSync.current = null;
               setSyncing(false);
               setSyncMessage(
-                "Playback was blocked. Click to sync and play, or allow playback in your browser.",
+                needsClick
+                  ? "Playback was blocked. Click to sync and play, or allow playback in your browser."
+                  : `Playback failed: ${message}`,
               );
             }
           })
@@ -481,6 +602,7 @@ function App() {
       return;
     }
     if (r.media.kind === "external") return;
+    if (manualSync.current) return;
     const request = {
       id: crypto.randomUUID(),
       expires: performance.now() + 12000,
@@ -507,6 +629,7 @@ function App() {
         return;
       }
       const current = accept(latest.current, result.room);
+      if (result.synchronization) setLastCheck(result.synchronization);
       latest.current = current;
       setRoom((previous) => accept(previous, current));
       request.confirmed = true;
@@ -521,6 +644,7 @@ function App() {
       setSyncing(false);
       setSyncMessage("Connection lost. Sync again after reconnecting.");
     }
+    if (status !== "Connected") setPreparingPlay(false);
   }, [status]);
   useEffect(() => {
     if (!room) return;
@@ -530,12 +654,22 @@ function App() {
     }
     synchronize();
     const interval = setInterval(synchronize, 100);
-    return () => clearInterval(interval);
+    const wait = room.playing
+      ? room.anchor - (monotonic() + offsetRef.current)
+      : 0;
+    const startTimer =
+      wait > 0 ? setTimeout(() => syncRef.current(), wait) : undefined;
+    return () => {
+      clearInterval(interval);
+      clearTimeout(startTimer);
+    };
   }, [room?.version, synchronize]);
   useEffect(() => {
     if (!room) return;
     loadedRevision.current = -1;
     playPending.current = false;
+    setProtocolMessage("");
+    setLastCheck(null);
     setVideoError("Loading source…");
     setBlocked(false);
     if (room.media.kind === "external") {
@@ -871,7 +1005,11 @@ function App() {
             </Suspense>
             <div className="player-top">
               <span className="pill">
-                {room.playing ? "● PLAYING TOGETHER" : "Ⅱ PAUSED"}
+                {room.playing
+                  ? room.anchor > monotonic() + offsetRef.current
+                    ? "◷ STARTING TOGETHER"
+                    : "● PLAYING TOGETHER"
+                  : "Ⅱ PAUSED"}
               </span>
               <span className="pill">
                 {room.media.kind === "external"
@@ -892,6 +1030,9 @@ function App() {
                 <button
                   onClick={() => {
                     loadedRevision.current = -1;
+                    playPending.current = false;
+                    blockedRef.current = false;
+                    if (manualSync.current) manualSync.current.adjusted = false;
                     setBlocked(false);
                     setVideoError("Retrying source…");
                     setPlayerAttempt((attempt) => attempt + 1);
@@ -935,7 +1076,7 @@ function App() {
           <div className="transport">
             <button
               aria-label={room.playing ? "Pause" : "Play"}
-              disabled={!canControl}
+              disabled={!canControl || preparingPlay}
               onClick={() => command({ type: room.playing ? "pause" : "play" })}
             >
               {room.playing ? "Ⅱ" : "▶"}
@@ -988,6 +1129,11 @@ function App() {
           >
             {syncMessage}
           </p>
+          {protocolMessage && (
+            <p className="protocol-feedback" role="status">
+              {protocolMessage}
+            </p>
+          )}
           <div className="under-player">
             <span>
               {host
@@ -1025,6 +1171,9 @@ function App() {
           </div>
           {diagnostics && (
             <div className="diagnostic">
+              <span>
+                Device-check protocol <b>3 exchanges per connected device</b>
+              </span>
               <span>
                 RTT <b>{rtt.toFixed(1)} ms</b>
               </span>
@@ -1319,6 +1468,32 @@ function App() {
                             : "Catching up"
                         : "Reconnecting…"}
                     </small>
+                    {(() => {
+                      const check =
+                        lastCheck?.mediaRevision === room.mediaRevision
+                          ? lastCheck
+                          : room.synchronization;
+                      const measurement = check?.participants.find(
+                        (x) => x.participantId === p.id,
+                      );
+                      return (
+                        measurement && (
+                          <small className="device-delay">
+                            Last check:{" "}
+                            {measurement.rttMs === null
+                              ? "no response"
+                              : `${measurement.rttMs.toFixed(0)} ms RTT`}{" "}
+                            ·{" "}
+                            {measurement.ready
+                              ? "source ready"
+                              : "waiting for source"}
+                            {measurement.autoplayBlocked
+                              ? " · needs a click"
+                              : ""}
+                          </small>
+                        )
+                      );
+                    })()}
                   </div>
                   {host && p.id !== self && (
                     <button

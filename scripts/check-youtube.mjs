@@ -61,6 +61,16 @@ try {
       undefined,
       { timeout: 10000 },
     );
+    await page.getByRole("button", { name: "Sync me now" }).click();
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector("#sync-feedback")
+          ?.textContent.includes("Synced to the room"),
+      undefined,
+      { timeout: 10000 },
+    );
+    report.manualSyncConfirmed = true;
     report.passed = true;
   } catch (error) {
     report.playbackError = String(error.message).split("\n")[0];

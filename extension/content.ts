@@ -156,6 +156,11 @@ if (!document.getElementById("foyer-companion")) {
       reportAvailability("buffering");
       return;
     }
+    if (room.playing && room.anchor > now() + offset) {
+      if (!bound.paused) bound.pause();
+      bound.playbackRate = 1;
+      return;
+    }
     reportAvailability("ready");
     const expected = expectedPosition(room, now() + offset),
       delta = expected - bound.currentTime;
@@ -178,13 +183,8 @@ if (!document.getElementById("foyer-companion")) {
     if (!room.playing && !bound.paused) bound.pause();
   }
   const nativeAction = (type: string) => {
-    if (
-      adActive() ||
-      !matches() ||
-      !controls() ||
-      !bound
-    )
-      return;
+    if (room?.playing && room.anchor > now() + offset) return;
+    if (adActive() || !matches() || !controls() || !bound) return;
     // Browser events caused by our own correction can arrive after the seek/play
     // promise settles. Compare them with the authoritative room before emitting
     // anything, so a delayed player event cannot create a control feedback loop.
@@ -192,9 +192,8 @@ if (!document.getElementById("foyer-companion")) {
     if (type === "pause" && !room!.playing) return;
     if (
       type === "seek" &&
-      Math.abs(
-        expectedPosition(room!, now() + offset) - bound.currentTime,
-      ) < 0.4
+      Math.abs(expectedPosition(room!, now() + offset) - bound.currentTime) <
+        0.4
     )
       return;
     void command(
@@ -265,7 +264,32 @@ if (!document.getElementById("foyer-companion")) {
   button("fresh").onclick = () => void connect(true);
   button("play").onclick = () => void command({ type: "play" });
   button("pause").onclick = () => void command({ type: "pause" });
-  button("sync").onclick = () => apply(true);
+  button("sync").onclick = () => {
+    const code = room?.code;
+    if (!code || status !== "Connected") {
+      notice("Reconnect before syncing.");
+      return;
+    }
+    apply(true);
+    notice("Checking device delays…");
+    void chrome.runtime
+      .sendMessage({ type: "foyer:sync" })
+      .then((result: Result) => {
+        if (room?.code !== code) return;
+        if (!result?.ok || !result.room) {
+          notice(result?.error || "Sync check failed.");
+          return;
+        }
+        room = acceptSnapshot(room, result.room);
+        apply(true);
+        notice(
+          bound && matches() && !adActive() && bound.readyState >= 2
+            ? "Device delays checked. This player is following the room."
+            : "Device delays checked. Waiting for the matching source to become ready.",
+        );
+      })
+      .catch(() => notice("Reconnect before syncing."));
+  };
   button("bind").onclick = () => void useTitle();
   button("seekbutton").onclick = () =>
     void command({ type: "seek", position: Number(input("seek").value) });
@@ -327,8 +351,31 @@ if (!document.getElementById("foyer-companion")) {
         (b.onclick = () =>
           void command({ type: "reaction", emoji: b.textContent })),
     );
-  chrome.runtime.onMessage.addListener((message) => {
+  chrome.runtime.onMessage.addListener((message, _sender, respond) => {
     switch (message.type) {
+      case "foyer:sync-check": {
+        const clientReceivedAt = now(),
+          packet = message.packet;
+        respond({
+          id: packet.id,
+          sequence: packet.sequence,
+          mediaRevision: room?.mediaRevision ?? -1,
+          clientReceivedAt,
+          clientSentAt: now(),
+          ready:
+            !!room &&
+            room.code === packet.code &&
+            room.mediaRevision === packet.mediaRevision &&
+            matches() &&
+            !adActive() &&
+            !!bound &&
+            bound.readyState >= 2 &&
+            bound.seekable.length > 0 &&
+            !bound.seeking,
+          autoplayBlocked: false,
+        });
+        break;
+      }
       case "foyer:toggle":
         $("panel").classList.toggle("hidden");
         break;
@@ -367,8 +414,9 @@ if (!document.getElementById("foyer-companion")) {
     .then((settings: { server?: unknown; name?: unknown }) => {
       if (typeof settings.server === "string")
         input("server").value = settings.server;
-      if (typeof settings.name === "string") input("name").value = settings.name;
-  });
+      if (typeof settings.name === "string")
+        input("name").value = settings.name;
+    });
   setInterval(() => {
     bindVideo();
     apply();

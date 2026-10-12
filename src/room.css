@@ -331,3 +331,13 @@
     font-size: 11px;
   }
 }
+
+.protocol-feedback {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #bdb0ce;
+  margin: 0 0 12px;
+}
+.device-delay {
+  color: #b4c9c4 !important;
+}

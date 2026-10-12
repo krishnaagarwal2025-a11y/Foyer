@@ -73,6 +73,9 @@ export class RedisRoomStore implements RoomStore {
       )) === "OK"
     );
   }
+  async broadcast(event: CloudEvent) {
+    await this.client.publish(this.channel, JSON.stringify(event));
+  }
   async release(key: string, owner: string) {
     await this.client.eval(UNLOCK, 1, `${this.prefix}lock:${key}`, owner);
   }

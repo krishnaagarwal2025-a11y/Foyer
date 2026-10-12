@@ -11,7 +11,9 @@ import {
   type Room,
   type Result,
   type Movie,
+  type Synchronization,
 } from "../shared/types.js";
+import { startLeadMs } from "../shared/sync.js";
 const name = z.string().trim().min(1).max(32);
 const id = z.string().min(1).max(80);
 const genre = z.enum([
@@ -112,6 +114,14 @@ const envelope = z.object({
 type Credentials = { id: string; token: string };
 type Session = { code: string; id: string };
 export type Saved = { room: Room; tokens: Record<string, string> };
+export type PlaybackPreparation = {
+  baseline?: Pick<
+    Room,
+    "code" | "mediaRevision" | "anchor" | "position" | "playing"
+  >;
+  check?: Synchronization;
+  deferAutoAdvance?: boolean;
+};
 export class Engine {
   library = new Map<string, Movie>();
   rooms = new Map<string, Room>();
@@ -310,7 +320,29 @@ export class Engine {
       this.commit(r);
     }
   }
-  apply(socketId: string, input: unknown): Result {
+  preparePlayback(socketId: string, input: unknown): Result {
+    const current = this.sync(socketId);
+    if (!current.ok) return current;
+    const parsed = envelope.safeParse(input);
+    if (!parsed.success || parsed.data.command.type !== "play")
+      return { ok: false, error: "Invalid play request." };
+    const session = this.sessions.get(socketId)!;
+    const duplicate = this.operations
+      .get(session.code)
+      ?.get(`${session.id}:${parsed.data.opId}`);
+    if (duplicate) return duplicate;
+    const room = current.room!;
+    if (parsed.data.mediaRevision !== room.mediaRevision)
+      return { ok: false, error: "Media changed. Sync and try again." };
+    if (room.hostId !== session.id && !room.settings.collaborative)
+      return { ok: false, error: "Only the host can control playback." };
+    return current;
+  }
+  apply(
+    socketId: string,
+    input: unknown,
+    preparation?: PlaybackPreparation,
+  ): Result {
     const s = this.sessions.get(socketId);
     if (!s) return { ok: false, error: "Join a room first." };
     const parsed = envelope.safeParse(input);
@@ -355,6 +387,26 @@ export class Engine {
       return { ok: false, error: "Only the host can perform this action." };
     if (controls.includes(c.type) && mediaRevision !== r.mediaRevision)
       return { ok: false, error: "Media changed. Sync and try again." };
+    if (c.type === "play" && preparation?.baseline) {
+      const b = preparation.baseline;
+      if (
+        b.code !== r.code ||
+        b.mediaRevision !== r.mediaRevision ||
+        b.anchor !== r.anchor ||
+        b.position !== r.position ||
+        b.playing !== r.playing
+      )
+        return {
+          ok: false,
+          error:
+            "Playback changed while checking devices. Sync and try Play again.",
+        };
+      if (
+        !preparation.check ||
+        preparation.check.mediaRevision !== r.mediaRevision
+      )
+        return { ok: false, error: "Device check belongs to another source." };
+    }
     const setMedia = (movie: Movie) => {
       r.media = movie;
       r.mediaRevision++;
@@ -362,6 +414,7 @@ export class Engine {
       r.position = 0;
       r.anchor = this.now();
       r.playing = false;
+      delete r.synchronization;
     };
     const next = () => {
       const winner = r.queue
@@ -434,7 +487,7 @@ export class Engine {
         const position = expectedPosition(r, this.now());
         r.media = { ...r.media, duration: c.duration };
         r.position = Math.min(position, c.duration);
-        r.anchor = this.now();
+        r.anchor = r.playing ? Math.max(this.now(), r.anchor) : this.now();
         break;
       }
       case "availability":
@@ -443,7 +496,13 @@ export class Engine {
       case "play":
         r.position = expectedPosition(r, this.now());
         if (r.position >= r.media.duration) r.position = 0;
-        r.anchor = this.now();
+        r.anchor =
+          this.now() +
+          (preparation?.check
+            ? startLeadMs(preparation.check.participants)
+            : 0);
+        if (preparation?.check)
+          r.synchronization = { ...preparation.check, startAt: r.anchor };
         r.playing = true;
         break;
       case "pause":
@@ -453,7 +512,7 @@ export class Engine {
         break;
       case "seek":
         r.position = Math.min(c.position, r.media.duration);
-        r.anchor = this.now();
+        r.anchor = r.playing ? Math.max(this.now(), r.anchor) : this.now();
         break;
       case "media":
       case "enqueue": {
@@ -548,7 +607,8 @@ export class Engine {
         r.position = r.media.duration;
         r.anchor = this.now();
         r.playing = false;
-        if (r.settings.autoAdvance && next()) r.playing = true;
+        if (r.settings.autoAdvance && next())
+          r.playing = !preparation?.deferAutoAdvance;
         break;
       case "poll":
         if (r.polls.length >= 10) r.polls.shift();

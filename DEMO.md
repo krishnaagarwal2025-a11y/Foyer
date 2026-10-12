@@ -26,3 +26,7 @@ Open https://foyer-cyan.vercel.app on both devices and follow the same room walk
 ## Current room navigation
 
 Chat opens by default in **Room**. Use **Discover** for film/song search and **People** for preferences, host transfer and room settings. Expand **Add a link** beneath the player to paste media. The catalog starts at **Playable only**; uncheck it before the sample fuzzy-search demonstration. **Sync me now** visibly reports progress and success and retries blocked playback locally without granting guest control. To demonstrate a failed request, the browser regression test drops just the sync acknowledgement; the interface reports a timeout instead of success. Network disconnection is detected by heartbeat (up to about 15 seconds), then the separate 15-second grace period begins; closing a client normally is detected sooner.
+
+## Protocol demonstration
+
+Create a room in two browser contexts and open People on each. Press Play in Foyer: both receive three device checks; inspect the measured RTT/readiness rows and the temporary Starting together state. Repeat in Listen with the included audio demo. On the guest, press Sync me now: both devices are probed again, clock calibration updates, and only the guest's player is corrected. Turn one device offline or delay its responses to demonstrate bounded waiting and catch-up. Queue a playable item and use Play winner; enable automatic advancement to show that the next source also gets a prepared start. The RTT is round-trip delay, not an exact one-way delay.

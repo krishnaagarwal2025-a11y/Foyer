@@ -68,3 +68,21 @@ Sync review verification:
 - Desktop/mobile screenshots inspected: evidence/room-clear-desktop.png and evidence/room-clear-mobile.png.
 - Local ten-client socket p95 6.79 ms, 810 samples. Public deployment verification next.
 - Restore now clones checkpoints and advances versions; keyboard shortcuts ignore modifiers/repeat; delayed sync replies cannot re-open an expired/different room.
+
+## Device-check handshake steering
+
+User requested explicit check packets before audio/video start and on manual sync.
+- Added three per-device acknowledgement exchanges, server elapsed-clock RTT measurement, four-timestamp clock calibration and source readiness reports.
+- Pub/Sub shares checks/reports across function instances; each worker authenticates its own socket against the current shared lease owner.
+- Play commits a common future server-time anchor based on measured RTT. Clients hold playback until the deadline. Bounded missing responses become catch-up status.
+- Manual sync probes the room, fetches a final authoritative snapshot, then force-corrects only the requester.
+- Concurrent timeline/source changes reject old preflight; repeated operation IDs do not trigger a second check. Auto-advance and Play winner now load first, then perform prepared Play.
+- Extended companion packet bridging and scheduling, and separated protocol overhead in socket benchmark descriptions.
+- Unit/browser/load verification and deployment of this further change in progress.
+
+Protocol final local verification:
+- All 51 unit tests / seven browser workflows pass. Initial browser failure was a test timing assumption: a server-controlled checkbox requires waiting for its confirmed snapshot; the test now clicks then waits for checked state.
+- Live two-process shared Redis handshake succeeds for every peer; samples are server-measured, socket readiness synthetic.
+- Ten-context local browser protocol benchmark passes: delivery p95 83.58ms, application p95 204.89ms, maximum corrected drift 148ms.
+- Extension packaging passes; cloud temporary servers stopped; local server remains running.
+- Publishing source and final public verification next.

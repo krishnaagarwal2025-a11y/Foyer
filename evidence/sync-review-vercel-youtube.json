@@ -1,0 +1,29 @@
+{
+  "startedAt": "2026-10-12T10:20:29.049Z",
+  "source": "https://www.youtube.com/watch?v=M7lc1UVf-VE",
+  "url": "https://foyer-cyan.vercel.app",
+  "passed": true,
+  "limitations": "Live external-service smoke test, one Chromium page at the recorded URL. Video availability and autoplay are provider-dependent; not a synchronization benchmark.",
+  "embedLoaded": true,
+  "manualSyncConfirmed": true,
+  "appliedSamples": 35,
+  "positionSeconds": "5.8",
+  "playerBounds": {
+    "x": 52.1875,
+    "y": -484,
+    "width": 783.625,
+    "height": 440.78125
+  },
+  "videoElement": {
+    "currentTime": 5.895217,
+    "paused": false,
+    "readyState": 4,
+    "videoWidth": 854,
+    "videoHeight": 480,
+    "renderedWidth": 784,
+    "renderedHeight": 441
+  },
+  "feedback": [],
+  "autoplayAction": false,
+  "completedAt": "2026-10-12T10:20:38.492Z"
+}

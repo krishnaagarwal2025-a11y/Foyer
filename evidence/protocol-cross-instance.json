@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-10-12T16:37:03.033Z",
+  "urls": [
+    "http://localhost:3002",
+    "http://localhost:3003"
+  ],
+  "separateServerEndpoints": true,
+  "limitation": "Two explicitly separate local processes sharing real Redis",
+  "playbackLimit": "Socket-only clients report synthetic readiness; this is a protocol test, not a video playback test.",
+  "checks": [
+    "room join",
+    "Redis Pub/Sub seek delivery",
+    "playing late join",
+    "unauthorized control rejected",
+    "duplicate operation deduplicated",
+    "stable identity reconnect",
+    "fresh guest sync snapshot and invalid/unauthenticated sync rejection",
+    "three measured check exchanges across every room participant"
+  ],
+  "passed": true
+}

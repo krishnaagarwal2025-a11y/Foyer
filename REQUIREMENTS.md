@@ -63,3 +63,11 @@ YouTube playback regression verification: `tests/browser/youtube.spec.ts` uses t
 - `tests/browser/sync.spec.ts`: modest paused drift, autoplay recovery via Sync me now, keyboard action, no guest command feedback, sidebar/mobile layout, dropped response and offline control disabling.
 - `tests/browser/youtube.spec.ts`: manual sync recovery through an asynchronous official-API-shaped fixture; this tests integration, not live provider availability.
 - `tests/engine.test.ts`, `tests/cloud.test.ts`: guest sync freshness, immutable public snapshots, token exclusion, stale-owner rejection and restart version ordering. 46 unit tests and six local browser workflows pass.
+
+## Device-check protocol verification
+
+- `server/sync-protocol.ts`: three per-member acknowledgement exchanges, elapsed-clock RTT, source readiness, bounded timeouts and coalesced active checks. Redis publishes requests/reports across instances; lease owners determine eligible sockets.
+- `shared/sync.ts`: four-timestamp offset and bounded common-start lead; `server/engine.ts`: role/operation validation, future anchors, old-preflight rejection, countdown-preserving seeks/duration changes and paused source loading before prepared advancement.
+- `src/main.tsx`: packet acknowledgements, fresh clock calibration, scheduled playback hold/timer, manual force correction, People RTT/readiness and accessible progress feedback. Companion packet bridging is in `extension/worker.ts` / `extension/content.ts`.
+- `tests/sync-protocol.test.ts`: two actual Socket.IO servers, three exchanges per peer, synthetic link delay/clock skew, missing replies, coalescing, scheduling, concurrency and deduplication. `tests/browser/protocol.spec.ts`: actual video/audio starts, peer manual checks, countdown hold, queued winner and auto-advance.
+- 51 unit tests and seven local browser workflows pass. Real two-process Redis evidence: `evidence/protocol-cross-instance.json`. Ten isolated browser contexts: `evidence/protocol-local-browser.json`. Extension ZIP/package checks pass; signed-in subscription playback remains unverified.

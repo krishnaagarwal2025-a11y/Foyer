@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { Engine, type Saved } from "./engine.js";
+import { Engine, type Saved, type PlaybackPreparation } from "./engine.js";
 import type { Movie, Result, Room } from "../shared/types.js";
 
 export type CloudRecord = Saved & {
@@ -9,7 +9,8 @@ export type CloudRecord = Saved & {
 };
 export type CloudEvent = {
   code: string;
-  type: "state" | "reaction" | "closed";
+  type:
+    "state" | "reaction" | "closed" | "probe" | "probe-report" | "sync-result";
   data?: unknown;
 };
 export interface RoomStore {
@@ -255,7 +256,11 @@ export class CloudCoordinator {
       return result;
     });
   }
-  async apply(sid: string, input: unknown): Promise<Result> {
+  async apply(
+    sid: string,
+    input: unknown,
+    preparation?: PlaybackPreparation,
+  ): Promise<Result> {
     const session = this.engine.sessions.get(sid);
     if (!session) return { ok: false, error: "Join a room first." };
     return this.locked(session.code, async (owner) => {
@@ -287,7 +292,7 @@ export class CloudCoordinator {
           );
           if (movie) this.engine.library.set(movie.id, movie);
         }
-        result = this.engine.apply(sid, input);
+        result = this.engine.apply(sid, input, preparation);
       }
       await this.flush(session.code, session.code, owner, record.leases);
       return result;

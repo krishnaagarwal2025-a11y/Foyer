@@ -8,6 +8,18 @@ const sockets = [];
 const connect = async (url) => {
   const s = io(url, { transports: ["websocket"], forceNew: true });
   sockets.push(s);
+  s.on("sync-check", (packet, ack) => {
+    const now = performance.timeOrigin + performance.now();
+    ack({
+      id: packet.id,
+      sequence: packet.sequence,
+      mediaRevision: packet.mediaRevision,
+      clientReceivedAt: now,
+      clientSentAt: performance.timeOrigin + performance.now(),
+      ready: true,
+      autoplayBlocked: false,
+    });
+  });
   await new Promise((yes, no) => {
     s.once("connect", yes);
     s.once("connect_error", (e) =>
@@ -62,6 +74,12 @@ try {
   assert.deepEqual(first, repeated);
   const synced = await emit(b, "sync", {});
   assert(synced.ok, synced.error);
+  assert.equal(synced.synchronization.participants.length, 3);
+  assert(
+    synced.synchronization.participants.every(
+      (p) => p.samples === 3 && p.rttMs !== null,
+    ),
+  );
   assert.equal(synced.room.position, 30);
   assert(synced.room.playing);
   assert.equal((await emit(b, "sync", { code: "FORGED" })).ok, false);
@@ -86,6 +104,8 @@ try {
       new Set(urls).size > 1
         ? "Two explicitly separate local processes sharing real Redis"
         : "Public function instance placement not observable",
+    playbackLimit:
+      "Socket-only clients report synthetic readiness; this is a protocol test, not a video playback test.",
     checks: [
       "room join",
       "Redis Pub/Sub seek delivery",
@@ -94,6 +114,7 @@ try {
       "duplicate operation deduplicated",
       "stable identity reconnect",
       "fresh guest sync snapshot and invalid/unauthenticated sync rejection",
+      "three measured check exchanges across every room participant",
     ],
     passed: true,
   };

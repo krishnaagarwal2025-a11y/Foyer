@@ -11,6 +11,9 @@ import { rateLimit } from "express-rate-limit";
 import { mountMusic } from "./music.js";
 import { CloudCoordinator } from "./cloud.js";
 import { RedisRoomStore } from "./redis-store.js";
+import { SyncProtocol } from "./sync-protocol.js";
+import type { PlaybackPreparation } from "./engine.js";
+import type { Result } from "../shared/types.js";
 
 export async function createApplication({ cloud = false } = {}) {
   let db: DatabaseSync | undefined;
@@ -121,7 +124,16 @@ export async function createApplication({ cloud = false } = {}) {
       );
     },
   });
+  let protocol: SyncProtocol;
   const emit = (event: import("./cloud").CloudEvent) => {
+    if (event.type === "probe" || event.type === "probe-report") {
+      void protocol?.receive(event).catch(() => {});
+      return;
+    }
+    if (event.type === "sync-result") {
+      io.to(event.code).emit("sync-checked", event.data);
+      return;
+    }
     io.to(event.code).emit(event.type, event.data);
     if (event.type === "closed") {
       io.in(event.code).socketsLeave(event.code);
@@ -175,6 +187,32 @@ export async function createApplication({ cloud = false } = {}) {
       } catch {}
     }
   }
+  protocol = new SyncProtocol(
+    io,
+    () => engine.now(),
+    async (code) => {
+      const record = store ? await store.load(code) : undefined;
+      return new Map(
+        [...engine.sessions].flatMap(([sid, session]) => {
+          if (session.code !== code || !io.sockets.sockets.has(sid)) return [];
+          if (
+            store &&
+            (!record?.room.participants.some(
+              (p) => p.id === session.id && p.connected,
+            ) ||
+              record.leases[session.id]?.owner !== sid)
+          )
+            return [];
+          return [[sid, session.id] as [string, string]];
+        }),
+      );
+    },
+    async (event) => {
+      if (store) await store.broadcast(event);
+      else if (event.type === "sync-result") emit(event);
+      else await protocol.receive(event);
+    },
+  );
   app.get("/api/catalog", (_req, res) =>
     res.json(
       db
@@ -235,6 +273,23 @@ export async function createApplication({ cloud = false } = {}) {
       }
       return ++controls <= 20;
     };
+    const snapshot = () =>
+      coordinator
+        ? coordinator.sync(socket.id)
+        : Promise.resolve(engine.sync(socket.id));
+    const transact = (data: unknown, preparation?: PlaybackPreparation) =>
+      coordinator
+        ? coordinator.apply(socket.id, data, preparation)
+        : Promise.resolve(engine.apply(socket.id, data, preparation));
+    const preparedPlay = async (data: unknown): Promise<Result> => {
+      const current = await snapshot();
+      if (!current.ok) return current;
+      const prepared = engine.preparePlayback(socket.id, data);
+      // Deduplicated successful operations have no room; do not probe them again.
+      if (!prepared.ok || !prepared.room) return prepared;
+      const check = await protocol.check(prepared.room, "play");
+      return transact(data, { baseline: prepared.room, check });
+    };
     socket.on("clock", (_data, ack) => {
       if (typeof ack === "function") ack({ serverTime: engine.now() });
     });
@@ -270,9 +325,32 @@ export async function createApplication({ cloud = false } = {}) {
       }
       enqueue(async () => {
         try {
-          const result = coordinator
-            ? await coordinator.apply(socket.id, data)
-            : engine.apply(socket.id, data);
+          let result: Result;
+          if (data?.command?.type === "play") result = await preparedPlay(data);
+          else {
+            const before = ["ended", "next"].includes(data?.command?.type)
+              ? await snapshot()
+              : undefined;
+            result = await transact(data, { deferAutoAdvance: true });
+            if (
+              result.ok &&
+              before?.room &&
+              (data?.command?.type === "next" ||
+                before.room.settings.autoAdvance)
+            ) {
+              const after = await snapshot();
+              if (
+                after.room &&
+                after.room.mediaRevision !== before.room.mediaRevision
+              ) {
+                result = await preparedPlay({
+                  opId: crypto.randomUUID(),
+                  mediaRevision: after.room.mediaRevision,
+                  command: { type: "play" },
+                });
+              }
+            }
+          }
           if (typeof ack === "function") ack(result);
         } catch {
           if (typeof ack === "function")
@@ -300,11 +378,21 @@ export async function createApplication({ cloud = false } = {}) {
       }
       enqueue(async () => {
         try {
-          ack(
-            coordinator
-              ? await coordinator.sync(socket.id)
-              : engine.sync(socket.id),
-          );
+          const current = await snapshot();
+          if (!current.ok || !current.room) {
+            ack(current);
+            return;
+          }
+          const check = await protocol.check(current.room, "manual");
+          const fresh = await snapshot();
+          if (fresh.room && fresh.room.mediaRevision !== check.mediaRevision) {
+            ack({
+              ok: false,
+              error: "Source changed during the device check. Sync again.",
+            });
+            return;
+          }
+          ack({ ...fresh, synchronization: check });
         } catch {
           ack({
             ok: false,

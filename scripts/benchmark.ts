@@ -31,6 +31,18 @@ try {
   for (let i = 0; i < count; i++) {
     const s = io(url, { transports: ["websocket"], forceNew: true });
     clients.push(s);
+    s.on("sync-check", (packet, ack) => {
+      const received = performance.timeOrigin + performance.now();
+      ack({
+        id: packet.id,
+        sequence: packet.sequence,
+        mediaRevision: packet.mediaRevision,
+        clientReceivedAt: received,
+        clientSentAt: performance.timeOrigin + performance.now(),
+        ready: true,
+        autoplayBlocked: false,
+      });
+    });
     await new Promise<void>((resolve, reject) => {
       s.once("connect", () => resolve());
       s.once("connect_error", reject);
@@ -85,7 +97,7 @@ try {
     commands: iterations,
     warmupCommands: 9,
     method:
-      "One Node monotonic clock. Start immediately before host emit; end in each recipient state callback. Includes server validation, durable checkpoint and broadcast. Recipients exclude sender.",
+      "One Node monotonic clock. Start immediately before host emit; end in each recipient state callback. Includes the three-packet play preflight, validation, durable checkpoint and broadcast. Socket-only peers report synthetic source readiness; no video is played. Recipients exclude sender.",
     environment: {
       os: os.type() + " " + os.release(),
       node: process.version,

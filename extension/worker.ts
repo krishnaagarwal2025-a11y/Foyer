@@ -1,6 +1,7 @@
 import { io, type Socket } from "socket.io-client";
 import { normalizeSource } from "../shared/media";
 import type { Room, Result } from "../shared/types";
+import { probeClockOffset } from "../shared/sync";
 type Connection = {
   socket: Socket;
   server: string;
@@ -10,6 +11,7 @@ type Connection = {
   offset: number;
   samples: { rtt: number; offset: number }[];
   resumeTimer?: ReturnType<typeof setTimeout>;
+  lastProbe?: string;
 };
 const connections = new Map<number, Connection>();
 const send = (tab: number, message: unknown) => {
@@ -72,6 +74,21 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       );
     return true;
   }
+  if (message.type === "foyer:sync") {
+    const c = connections.get(tab);
+    if (!c?.socket.connected) {
+      respond({ ok: false, error: "Reconnect before syncing." });
+      return;
+    }
+    c.socket
+      .timeout(5000)
+      .emit("sync", {}, (error: Error | null, result: Result) =>
+        respond(
+          error ? { ok: false, error: "Device check timed out." } : result,
+        ),
+      );
+    return true;
+  }
   if (message.type !== "foyer:connect") return;
   (async () => {
     try {
@@ -115,6 +132,24 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         samples: [],
       };
       connections.set(tab, c);
+      socket.on("sync-check", (packet, ack) => {
+        if (typeof ack !== "function") return;
+        void chrome.tabs
+          .sendMessage(tab, { type: "foyer:sync-check", packet })
+          .then(ack)
+          .catch(() => {});
+      });
+      socket.on("sync-clock", (packet) => {
+        if (c.lastProbe !== packet.id) {
+          c.lastProbe = packet.id;
+          c.samples = [];
+        }
+        c.samples.push({ rtt: packet.rttMs, offset: probeClockOffset(packet) });
+        c.samples = c.samples.slice(-20);
+        const best = [...c.samples].sort((a, b) => a.rtt - b.rtt)[0];
+        c.offset = best.offset;
+        send(tab, { type: "foyer:clock", offset: c.offset, rtt: packet.rttMs });
+      });
       const ping = () => {
         const start = now();
         socket
@@ -144,6 +179,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
           );
       };
       socket.on("connect", () => {
+        c.samples = [];
         send(tab, { type: "foyer:status", status: "Resuming" });
         const creatingRoom = !c.code;
         ping();

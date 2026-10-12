@@ -45,7 +45,40 @@ export type Chat = {
   spoiler: boolean;
   time: number;
 };
+export type SyncMeasurement = {
+  participantId: string;
+  rttMs: number | null;
+  samples: number;
+  ready: boolean;
+  autoplayBlocked: boolean;
+};
+export type Synchronization = {
+  id: string;
+  code: string;
+  reason: "play" | "manual";
+  checkedAt: number;
+  mediaRevision: number;
+  participants: SyncMeasurement[];
+  startAt?: number;
+};
+export type SyncProbe = {
+  id: string;
+  code: string;
+  mediaRevision: number;
+  reason: "play" | "manual";
+  participants: string[];
+  expiresAt: number;
+};
+export type SyncClockPacket = {
+  id: string;
+  serverSentAt: number;
+  serverReceivedAt: number;
+  clientReceivedAt: number;
+  clientSentAt: number;
+  rttMs: number;
+};
 export type Room = {
+  synchronization?: Synchronization;
   lastOperation?: { id: string; type: string };
   code: string;
   hostId: string;
@@ -67,6 +100,7 @@ export type Room = {
   };
 };
 export type Result = {
+  synchronization?: Synchronization;
   ok: boolean;
   error?: string;
   room?: Room;

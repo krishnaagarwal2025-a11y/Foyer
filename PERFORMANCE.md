@@ -105,3 +105,16 @@ Repeat using BENCH_URL or DEMO_URL set to the production URL, with BENCH_REPORT 
 After the manual-sync fix and sidebar reorganization, all **46 unit tests** and **six local browser workflows** pass. Extension packaging, TypeScript checks and the production build pass. Live YouTube API-demo playback reached 5.24 seconds with readyState 4 (actual provider video, not the fixture); see `evidence/sync-review-youtube.json`. Provider availability varies by title/account/browser.
 
 The ten-client localhost socket run (`evidence/sync-review-local-socket.json`) collected 810 deliveries after nine warm-up controls: p50 **5.35 ms**, p95 **6.79 ms**, maximum **12.79 ms**. This is socket delivery only. Public browser measurements for this revised version are recorded separately after deployment.
+
+## Device-check protocol performance
+
+The handshake-enabled localhost run used 10 isolated Chromium contexts, three acknowledgement exchanges per participant before each Play, the included video, muted audio and permitted autoplay. Background throttling was disabled. All measured controls and 300 drift samples completed without missing data. Intentional common-start waiting is included in player application timing. Conditions otherwise match the machine and clock-calibration methodology above.
+
+| Measurement | Samples | p50 | p95 | Maximum |
+|---|---:|---:|---:|---:|
+| Socket-only delivery including play preflight | 810 | 5.15 ms | 72.23 ms | 73.47 ms |
+| Browser event delivery including play preflight | 270 | 7.84 ms | 83.58 ms | 89.24 ms |
+| Browser player application, including scheduled wait | 270 | 120.28 ms | 204.89 ms | 210.98 ms |
+| Corrected absolute drift | 300 | 39.37 ms | 54.51 ms | 148.00 ms |
+
+Raw reports: `evidence/protocol-local-socket.json` and `evidence/protocol-local-browser.json`. RTT-based offset assumes symmetric routes; it is an estimate. Loopback is not a physical LAN test. Real Redis coordination was separately verified with two backend processes; that report is protocol-only and uses synthetic readiness. See SYNCHRONIZATION.md for the bounded missing-device policy and scheduled-anchor algorithm. Public deployment results are kept in separate reports.
