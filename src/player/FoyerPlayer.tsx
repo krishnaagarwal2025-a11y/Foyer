@@ -28,6 +28,7 @@ type Props = {
   media: Movie;
   revision: number;
   muted: boolean;
+  listenMode?: boolean;
   onReady: () => void;
   onPlaying: () => void;
   onSeeked: () => void;
@@ -111,6 +112,25 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
       callbacks = useRef(props);
     const [discPlaying, setDiscPlaying] = useState(false);
     callbacks.current = props;
+    useEffect(() => {
+      if (
+        !props.listenMode ||
+        !["youtube", "vimeo", "soundcloud"].includes(props.media.provider || "")
+      )
+        return;
+      const timer = setInterval(() => {
+        const player = adapter.current;
+        setDiscPlaying(
+          Boolean(
+            player &&
+            !failed.current &&
+            !player.paused &&
+            player.readyState >= 2,
+          ),
+        );
+      }, 250);
+      return () => clearInterval(timer);
+    }, [props.listenMode, props.media.provider, props.revision]);
     const proxy = useMemo(
       () =>
         new Proxy({} as PlaybackHandle, {
@@ -671,6 +691,32 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
     }, [props.muted]);
     const m = props.media,
       p = m.provider || "direct";
+    const artwork =
+      m.artwork ||
+      (p === "youtube" && m.sourceId
+        ? `https://i.ytimg.com/vi/${m.sourceId}/hqdefault.jpg`
+        : undefined);
+    const disc = (
+      <div
+        className={`record-art listening-disc ${discPlaying ? "is-playing" : ""}`}
+        style={{ "--movie-color": m.color } as React.CSSProperties}
+      >
+        <div className="listening-disc-label">
+          {artwork ? (
+            <img
+              src={artwork}
+              alt=""
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
+          ) : (
+            <span>♪</span>
+          )}
+        </div>
+      </div>
+    );
     if (m.kind === "empty")
       return (
         <div className="external-screen">
@@ -730,14 +776,32 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
           src={`https://w.soundcloud.com/player/?url=${encodeURIComponent(m.url!)}&auto_play=false&visual=true`}
         />
       );
-    if (["youtube", "vimeo"].includes(p))
-      return (
+    if (["youtube", "vimeo"].includes(p)) {
+      const embed = (
         <div
           ref={container}
           className="provider-frame"
           aria-label={`${p} player`}
         />
       );
+      if (props.listenMode)
+        return (
+          <div className="provider-listen">
+            <div className="provider-listen-art">
+              {disc}
+              <h2>{m.title}</h2>
+              <p>{m.artist || "Shared listening"}</p>
+            </div>
+            <div className="provider-listen-player">
+              <span className="eyebrow">
+                {p === "youtube" ? "YOUTUBE PLAYER" : "VIMEO PLAYER"}
+              </span>
+              {embed}
+            </div>
+          </div>
+        );
+      return embed;
+    }
     const events = {
       onLoadedMetadata: () => {
         if (failed.current) return;
@@ -776,25 +840,7 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
     if (m.kind === "audio")
       return (
         <div className="audio-screen">
-          <div
-            className={`record-art listening-disc ${discPlaying ? "is-playing" : ""}`}
-            style={{ "--movie-color": m.color } as React.CSSProperties}
-          >
-            <div className="listening-disc-label">
-              {m.artwork ? (
-                <img
-                  src={m.artwork}
-                  alt=""
-                  referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
-              ) : (
-                <span>♪</span>
-              )}
-            </div>
-          </div>
+          {disc}
           <h2>{m.title}</h2>
           <p>{m.artist || "A listening room for your people"}</p>
           <span className="pill">

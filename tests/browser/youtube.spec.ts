@@ -580,6 +580,7 @@ test("in-app music search plays a selected result across the room without a new 
         kind: "video",
         title: "In-app search fixture",
         artist: "Fixture artist",
+        artwork: "/foyer.svg",
         duration: 255,
         genres: ["Music"],
         tags: [],
@@ -639,6 +640,39 @@ test("in-app music search plays a selected result across the room without a new 
       ).toBeVisible();
       await expect.poll(async () => (await fixtureState(page)).state).toBe(1);
     }
+    for (const page of [host, guest]) {
+      await expect(
+        page.locator(".provider-listen .listening-disc img"),
+      ).toHaveAttribute("src", "/foyer.svg");
+      await expect(page.locator(".listening-disc")).toHaveCSS(
+        "animation-play-state",
+        "running",
+      );
+      for (const width of [920, 320]) {
+        await page.setViewportSize({ width, height: 844 });
+        const bounds = await page
+          .locator(".provider-frame iframe")
+          .boundingBox();
+        expect(bounds!.width).toBeGreaterThanOrEqual(200);
+        expect(bounds!.height).toBeGreaterThanOrEqual(200);
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+        ).toBe(true);
+      }
+    }
+    await host.getByRole("button", { name: "Pause", exact: true }).click();
+    for (const page of [host, guest])
+      await expect(page.locator(".listening-disc")).toHaveCSS(
+        "animation-play-state",
+        "paused",
+      );
+    await host.screenshot({
+      path: "evidence/youtube-disc-phone.png",
+      fullPage: true,
+    });
+    await host.setViewportSize({ width: 1440, height: 960 });
     expect(a.pages()).toHaveLength(1);
     expect(b.pages()).toHaveLength(1);
     expect(errors).toEqual([]);

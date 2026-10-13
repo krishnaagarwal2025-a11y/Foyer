@@ -888,33 +888,132 @@ details,
 
 /* Bundled OFL font keeps invitation characters distinct on every device. */
 @font-face {
- font-family: "Foyer Code";
- src: url("/fonts/JetBrainsMono-Regular.woff2") format("woff2");
- font-weight: 400;
- font-style: normal;
- font-display: swap;
+  font-family: "Foyer Code";
+  src: url("/fonts/JetBrainsMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
-.room-label strong, #room-code {
- font-family: "Foyer Code", Consolas, "SFMono-Regular", Menlo, monospace;
- font-weight: 400;
- font-variant-numeric: tabular-nums slashed-zero;
- font-feature-settings: "zero" 1;
- letter-spacing: 0.08em;
+.room-label strong,
+#room-code {
+  font-family: "Foyer Code", Consolas, "SFMono-Regular", Menlo, monospace;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-feature-settings: "zero" 1;
+  letter-spacing: 0.08em;
 }
 
 .hero-title-line {
- display: inline-block;
- background: linear-gradient(110deg, #d5b4f0 35%, #f4e8ff 48%, #d5b4f0 61%);
- background-size: 240% 100%;
- background-clip: text;
- -webkit-background-clip: text;
- -webkit-text-fill-color: transparent;
- animation: headline-reveal 650ms cubic-bezier(.2,.7,.2,1) both, headline-shimmer 6s linear infinite;
+  display: inline-block;
+  background: linear-gradient(110deg, #d5b4f0 35%, #f4e8ff 48%, #d5b4f0 61%);
+  background-size: 240% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation:
+    headline-reveal 650ms cubic-bezier(0.2, 0.7, 0.2, 1) both,
+    headline-shimmer 6s linear infinite;
 }
-.hero-title-line:last-child { animation-delay: 140ms, 140ms; }
-:root[data-theme="light"] .hero-title-line { background-image: linear-gradient(110deg, #643782 35%, #8b4da0 48%, #643782 61%); }
-@keyframes headline-reveal { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes headline-shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+.hero-title-line:last-child {
+  animation-delay: 140ms, 140ms;
+}
+:root[data-theme="light"] .hero-title-line {
+  background-image: linear-gradient(
+    110deg,
+    #643782 35%,
+    #8b4da0 48%,
+    #643782 61%
+  );
+}
+@keyframes headline-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes headline-shimmer {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
- .hero-title-line { animation: none; background: none; -webkit-text-fill-color: currentColor; }
+  .hero-title-line {
+    animation: none;
+    background: none;
+    -webkit-text-fill-color: currentColor;
+  }
+}
+
+.player:has(.provider-listen) {
+  aspect-ratio: auto;
+  min-height: 360px;
+  background: var(--surface);
+}
+.provider-listen {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(240px, 1.2fr);
+  gap: 24px;
+  padding: 52px 24px 24px;
+  align-items: center;
+}
+.provider-listen-art {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  min-width: 0;
+}
+.provider-listen-art h2 {
+  color: var(--text);
+  font-size: 20px;
+  margin: 18px 0 6px;
+  overflow-wrap: anywhere;
+}
+.provider-listen-art p {
+  color: var(--muted);
+  font-size: 12px;
+}
+.provider-listen-art .listening-disc {
+  width: 160px;
+  height: 160px;
+}
+.provider-listen-player {
+  min-width: 0;
+}
+.provider-listen-player .eyebrow {
+  display: block;
+  margin-bottom: 10px;
+}
+.provider-listen-player .provider-frame {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: 230px;
+  min-height: 200px;
+}
+.provider-listen-player iframe {
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+}
+@media (max-width: 700px) {
+  .provider-listen {
+    grid-template-columns: 1fr;
+    padding: 52px 16px 16px;
+    gap: 20px;
+  }
+  .provider-listen-art .listening-disc {
+    width: 120px;
+    height: 120px;
+  }
+  .provider-listen-player .provider-frame {
+    height: 220px;
+  }
 }

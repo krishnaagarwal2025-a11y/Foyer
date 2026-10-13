@@ -1185,6 +1185,7 @@ function App() {
                   media={room.media}
                   revision={room.mediaRevision}
                   muted={muted}
+                  listenMode={room.settings.mode === "listen"}
                   onProviderControl={(type, position) => {
                     const current = latest.current;
                     if (!current || !canControl) return false;
