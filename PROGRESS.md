@@ -175,3 +175,6 @@ Scope: browser/phone emulation can reproduce Foyer-induced repeated seeks and fa
 - Replace native audio square with a circular grooved vinyl disc and clipped song-artwork center. Entire disc/artwork rotates with actual playing events and pauses on pause, waiting, ended or error; reduced motion disables spin. No-thumbnail tracks show a music label. Verified mobile native AAC playback with injected artwork metadata (presentation fixture, not a provider availability claim). Build passed; slow-network regression underway.
 
 - Listening-disc runtime b4d1f85 deployed as dpl_B9vpsBvDyCZ85mHGx1JN1txQj9NU. Live browser regression passes: rotating clipped artwork, pause preserves angle, reduced-motion disables rotation. Local slow-HTTP audio regression passes too (2/2 combined). Public health200; evidence saved.
+
+## Distinct room-code characters
+- User requested a code font that distinguishes O and 0. Bundle OFL-licensed JetBrains Mono and apply its zero variant to displayed room codes and the invitation-code input, keeping a monospace fallback. Build and desktop/mobile visual check next.

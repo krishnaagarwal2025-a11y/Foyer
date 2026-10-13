@@ -885,3 +885,19 @@ details,
     animation: none;
   }
 }
+
+/* Bundled OFL font keeps invitation characters distinct on every device. */
+@font-face {
+ font-family: "Foyer Code";
+ src: url("/fonts/JetBrainsMono-Regular.woff2") format("woff2");
+ font-weight: 400;
+ font-style: normal;
+ font-display: swap;
+}
+.room-label strong, #room-code {
+ font-family: "Foyer Code", Consolas, "SFMono-Regular", Menlo, monospace;
+ font-weight: 400;
+ font-variant-numeric: tabular-nums slashed-zero;
+ font-feature-settings: "zero" 1;
+ letter-spacing: 0.08em;
+}
