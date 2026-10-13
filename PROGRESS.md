@@ -159,3 +159,7 @@ Scope: browser/phone emulation can reproduce Foyer-induced repeated seeks and fa
 - User requested removal of default Watch videos: implemented empty room media, empty player, disabled transport until selected, and optional Discover demo. Listen defaults preserved.
 - Added empty-room creation/join/source-selection checks; existing playback fixtures explicitly select their sample. Build and 60 unit/integration tests pass; 16 browser checks running.
 - Provider recovery now keeps the local host paused until the matching authoritative barrier arrives and makes repeated paused seek checks idempotent. Deterministic tests reproduce both prior races.
+
+- Runtime 28a6d96 pushed to main and deployed to https://foyer-cyan.vercel.app as dpl_Bnis971ZMHREfhHEaq8RDVkD3B9w. All 16 local browser checks pass and final unit run is 60/60. Public regression checks in progress. New socket benchmark p95 16.60ms; ten-browser reruns crashed before samples, retained honestly. Live provider attempt failed readiness; local deterministic handshake recovery checks pass.
+
+- Final public-target checks 8/8 pass (7 public, 1 isolated injected application). Public slow-HTTP two-phone AAC check records zero post-start waiting events. Final source type-check passes; local and public health return200. Only remote main remains.

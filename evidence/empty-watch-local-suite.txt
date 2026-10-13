@@ -12,3 +12,10 @@ Running 16 tests using 1 worker
   ok  9 tests\browser\workflows.spec.ts:182:1 › invalid invitations, mobile layout and deterministic host replacement (18.5s)
   ok 10 tests\browser\workflows.spec.ts:215:1 › late join snapshots playback, corrects drift and recovers from a bad source (5.1s)
   ok 11 tests\browser\youtube.spec.ts:155:1 › host sync holds the local pause while the authoritative pause crosses the network (4.4s)
+  ok 12 tests\browser\youtube.spec.ts:197:1 › concurrent room checks do not cancel an in-flight paused provider seek (3.5s)
+  ok 13 tests\browser\youtube.spec.ts:242:1 › slow phone playback is not labelled autoplay-blocked and automatic correction gives buffering time to settle (21.6s)
+  ok 14 tests\browser\youtube.spec.ts:300:1 › YouTube buffering settles, native host actions synchronize, retry rebuilds and Music links join Listen (24.7s)
+  ok 15 tests\browser\youtube.spec.ts:499:1 › changing songs with a cached YouTube SDK never blanks host or guest (5.9s)
+  ok 16 tests\browser\youtube.spec.ts:569:1 › in-app music search plays a selected result across the room without a new tab or copied link (3.8s)
+
+  16 passed (3.3m)

@@ -1,0 +1,36 @@
+{
+  "startedAt": "2026-10-13T08:49:16.509Z",
+  "url": "http://127.0.0.1:3001",
+  "clients": 10,
+  "roundsPerMedia": 5,
+  "passed": false,
+  "browser": "Chromium",
+  "environment": {
+    "platform": "win32",
+    "node": "v24.15.0",
+    "cpus": 12
+  },
+  "conditions": "One machine, isolated contexts, autoplay allowed, background throttling disabled, actual bundled HTML5 media. Localhost or Internet according to URL; no physical phone/LAN, audible output or frame presentation measurement. Drift uses each browser's four-timestamp estimate of server time at the instant of its media read. RTT/paused alignment are server-collected reports, not independent video-frame proof.",
+  "trials": [],
+  "error": "Error: browserContext.newPage: Target crashed ",
+  "completedAt": "2026-10-13T08:49:24.147Z",
+  "pageErrors": [],
+  "pauseHandshakeCommitMs": {
+    "samples": 0,
+    "p50": null,
+    "p95": null,
+    "maximum": null
+  },
+  "reportedPausedAlignmentMs": {
+    "samples": 0,
+    "p50": null,
+    "p95": null,
+    "maximum": null
+  },
+  "estimatedPlaybackDriftMs": {
+    "samples": 0,
+    "p50": null,
+    "p95": null,
+    "maximum": null
+  }
+}

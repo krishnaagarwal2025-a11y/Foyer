@@ -30,6 +30,7 @@ const report: any = {
   roundsPerMedia: rounds,
   passed: false,
   browser: "Chromium",
+  lowMemoryRendererFlags: process.env.LOW_MEMORY === "1",
   environment: {
     platform: os.platform(),
     node: process.version,
@@ -44,6 +45,7 @@ const browser = await chromium.launch({
     "--autoplay-policy=no-user-gesture-required",
     "--disable-background-timer-throttling",
     "--disable-renderer-backgrounding",
+    ...(process.env.LOW_MEMORY === "1" ? ["--disable-gpu", "--renderer-process-limit=2", "--js-flags=--max-old-space-size=64 --max-semi-space-size=1"] : []),
   ],
 });
 const contexts: BrowserContext[] = [],

@@ -1,0 +1,79 @@
+{
+  "checkedAt": "2026-10-13T08:50:44.971Z",
+  "url": "https://foyer-cyan.vercel.app",
+  "passed": true,
+  "readings": [
+    {
+      "position": 3.261283,
+      "paused": false,
+      "readyState": 4,
+      "waitingEvents": 0,
+      "absoluteDriftMs": 71.14156054687504
+    },
+    {
+      "position": 3.294811,
+      "paused": false,
+      "readyState": 4,
+      "waitingEvents": 0,
+      "absoluteDriftMs": 49.439732421874716
+    },
+    {
+      "position": 5.302764,
+      "paused": false,
+      "readyState": 4,
+      "waitingEvents": 0,
+      "absoluteDriftMs": 56.06046289062494
+    },
+    {
+      "position": 5.314005,
+      "paused": false,
+      "readyState": 4,
+      "waitingEvents": 0,
+      "absoluteDriftMs": 55.64563476562512
+    },
+    {
+      "position": 7.330246,
+      "paused": false,
+      "readyState": 4,
+      "waitingEvents": 0,
+      "absoluteDriftMs": 60.77865820312489
+    },
+    {
+      "position": 7.362063,
+      "paused": false,
+      "readyState": 4,
+      "waitingEvents": 0,
+      "absoluteDriftMs": 57.358386718750154
+    },
+    {
+      "position": 9.344963,
+      "paused": false,
+      "readyState": 4,
+      "waitingEvents": 0,
+      "absoluteDriftMs": 67.56165820312532
+    },
+    {
+      "position": 9.376321,
+      "paused": false,
+      "readyState": 4,
+      "waitingEvents": 0,
+      "absoluteDriftMs": 64.00028906249844
+    },
+    {
+      "position": 11.365923,
+      "paused": false,
+      "readyState": 4,
+      "waitingEvents": 0,
+      "absoluteDriftMs": 46.251560546874515
+    },
+    {
+      "position": 11.397663,
+      "paused": false,
+      "readyState": 4,
+      "waitingEvents": 0,
+      "absoluteDriftMs": 70.65828906250005
+    }
+  ],
+  "pageErrors": [],
+  "conditions": "Two isolated touch-emulated Chromium contexts, autoplay allowed, actual AAC local audio. After loading the application, each page's HTTP requests are CDP-throttled to 100kbps download, 50kbps upload, 200ms latency before joining. This isolates media streaming rather than full application startup; not proof of WebSocket latency, physical mobile/Safari or real cellular packet-loss behavior. Waiting events counted after playback reached one second; drift uses the app's four-timestamp server-clock estimate."
+}

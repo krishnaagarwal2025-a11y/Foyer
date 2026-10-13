@@ -1,0 +1,13 @@
+
+Running 8 tests using 1 worker
+
+  ok 1 tests\browser\empty-watch.spec.ts:3:1 › Watch starts empty and an optional video can be selected (3.5s)
+  ok 2 tests\browser\phone-network.spec.ts:4:1 › two phone contexts stream compact audio on a slow HTTP connection without repeated stalls (32.3s)
+  ok 3 tests\browser\youtube.spec.ts:155:1 › host sync holds the local pause while the authoritative pause crosses the network (4.8s)
+  ok 4 tests\browser\youtube.spec.ts:197:1 › concurrent room checks do not cancel an in-flight paused provider seek (4.8s)
+  ok 5 tests\browser\youtube.spec.ts:242:1 › slow phone playback is not labelled autoplay-blocked and automatic correction gives buffering time to settle (21.6s)
+  ok 6 tests\browser\youtube.spec.ts:300:1 › YouTube buffering settles, native host actions synchronize, retry rebuilds and Music links join Listen (29.7s)
+  ok 7 tests\browser\youtube.spec.ts:499:1 › changing songs with a cached YouTube SDK never blanks host or guest (7.1s)
+  ok 8 tests\browser\youtube.spec.ts:569:1 › in-app music search plays a selected result across the room without a new tab or copied link (3.9s)
+
+  8 passed (1.9m)
