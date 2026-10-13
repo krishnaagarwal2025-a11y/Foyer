@@ -1,0 +1,92 @@
+
+Running 3 tests using 1 worker
+
+  x  1 tests\browser\workflows.spec.ts:21:1 › two browsers complete the social and synchronized playback workflow (535ms)
+  x  2 tests\browser\workflows.spec.ts:183:1 › invalid invitations, mobile layout and deterministic host replacement (534ms)
+  x  3 tests\browser\workflows.spec.ts:216:1 › late join snapshots playback, corrects drift and recovers from a bad source (597ms)
+
+
+  1) tests\browser\workflows.spec.ts:21:1 › two browsers complete the social and synchronized playback workflow 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3001/
+    Call log:
+      - navigating to "http://127.0.0.1:3001/", waiting until "load"
+
+
+      2 | import { test, expect, type Page } from "@playwright/test";
+      3 | async function enter(page: Page, name: string, code?: string) {
+    > 4 |   await page.goto(code ? `/?room=${code}` : "/");
+        |              ^
+      5 |   await page.getByLabel("Display name").fill(name);
+      6 |   await expect(
+      7 |     page.getByRole("button", {
+        at enter (C:\projects\watch_party\tests\browser\workflows.spec.ts:4:14)
+        at C:\projects\watch_party\tests\browser\workflows.spec.ts:38:24
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\workflows-two-browsers-com-75f48-chronized-playback-workflow\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\workflows-two-browsers-com-75f48-chronized-playback-workflow\test-failed-2.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\workflows-two-browsers-com-75f48-chronized-playback-workflow\error-context.md
+
+  2) tests\browser\workflows.spec.ts:183:1 › invalid invitations, mobile layout and deterministic host replacement 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3001/?room=ZZZZZZ
+    Call log:
+      - navigating to "http://127.0.0.1:3001/?room=ZZZZZZ", waiting until "load"
+
+
+      189 |     p2 = await c2.newPage();
+      190 |   try {
+    > 191 |     await p2.goto("/?room=ZZZZZZ");
+          |              ^
+      192 |     await p2.getByLabel("Display name").fill("Mobile");
+      193 |     await expect(p2.getByRole("button", { name: "Join room →" })).toBeEnabled();
+      194 |     await p2.getByRole("button", { name: "Join room →" }).click();
+        at C:\projects\watch_party\tests\browser\workflows.spec.ts:191:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\workflows-invalid-invitati-30253-erministic-host-replacement\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\workflows-invalid-invitati-30253-erministic-host-replacement\test-failed-2.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\workflows-invalid-invitati-30253-erministic-host-replacement\error-context.md
+
+  3) tests\browser\workflows.spec.ts:216:1 › late join snapshots playback, corrects drift and recovers from a bad source 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3001/
+    Call log:
+      - navigating to "http://127.0.0.1:3001/", waiting until "load"
+
+
+      2 | import { test, expect, type Page } from "@playwright/test";
+      3 | async function enter(page: Page, name: string, code?: string) {
+    > 4 |   await page.goto(code ? `/?room=${code}` : "/");
+        |              ^
+      5 |   await page.getByLabel("Display name").fill(name);
+      6 |   await expect(
+      7 |     page.getByRole("button", {
+        at enter (C:\projects\watch_party\tests\browser\workflows.spec.ts:4:14)
+        at C:\projects\watch_party\tests\browser\workflows.spec.ts:224:24
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\workflows-late-join-snapsh-f8955--recovers-from-a-bad-source\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\workflows-late-join-snapsh-f8955--recovers-from-a-bad-source\test-failed-2.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\workflows-late-join-snapsh-f8955--recovers-from-a-bad-source\error-context.md
+
+  3 failed
+    tests\browser\workflows.spec.ts:21:1 › two browsers complete the social and synchronized playback workflow 
+    tests\browser\workflows.spec.ts:183:1 › invalid invitations, mobile layout and deterministic host replacement 
+    tests\browser\workflows.spec.ts:216:1 › late join snapshots playback, corrects drift and recovers from a bad source 

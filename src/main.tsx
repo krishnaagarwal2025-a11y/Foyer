@@ -88,7 +88,7 @@ function App() {
     [self, setSelf] = useState(""),
     [tab, setTab] = useState("Chat"),
     [sidebarView, setSidebarView] = useState<"Room" | "Discover" | "People">(
-      "Room",
+      "Discover",
     ),
     [query, setQuery] = useState(""),
     [filter, setFilter] = useState("All"),
@@ -828,7 +828,7 @@ function App() {
     setLastCheck(null);
     setVideoError("Loading source…");
     setBlocked(false);
-    if (room.media.kind === "external") {
+    if (room.media.kind === "external" || room.media.kind === "empty") {
       setVideoError("");
       return;
     }
@@ -1546,7 +1546,7 @@ function App() {
         {!cinema && (
           <aside className="sidebar">
             <nav className="sidebar-nav" aria-label="Room tools">
-              {(["Room", "Discover", "People"] as const).map((view) => (
+              {(["Discover", "Room", "People"] as const).map((view) => (
                 <button
                   key={view}
                   aria-pressed={sidebarView === view}
@@ -1913,6 +1913,7 @@ function App() {
                       {host && (
                         <button
                           disabled={status !== "Connected"}
+                          className="queue-remove"
                           aria-label={`Remove ${q.movie.title}`}
                           onClick={() =>
                             command({ type: "remove", itemId: q.id })

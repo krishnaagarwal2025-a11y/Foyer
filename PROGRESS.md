@@ -187,3 +187,8 @@ Scope: browser/phone emulation can reproduce Foyer-induced repeated seeks and fa
 ## YouTube Listen artwork layout
 - User clarified YouTube Music needs the disc too. Add primary rotating thumbnail disc beside an intact visible official player in Listen mode. Watch layout preserved; phone stacks both. Provider rotation follows actual adapter paused/readiness. Official minimum visible size200x200 documented at https://developers.google.com/youtube/player_parameters. Build and provider regression next.
 - YouTube Listen runtime07ce679 deployed as dpl_85VpWzmh9q4yUDArJzgrBJHXs55d. Build and7 targeted browser checks pass (controlled SDK playback fixtures). Live Ek Tarfa search selected a song: real thumbnail loaded inside the circle, separate official iframe visible >=200x200, screenshot inspected. This live smoke validates layout/artwork, not a new timing/availability benchmark.
+
+## Discover-first tabs and compact remove control
+- Default sidebar Discover and order Discover/Room/People. Queue remove uses44x44 square alongside votes, with title spanning the row. Existing workflow fixtures explicitly select Room for chat checks. YouTube player removal not implemented: official policy prohibits hidden/background playback and separating audio; source https://developers.google.com/youtube/terms/developer-policies. Disc-only remains available for native audio. Build/browser check next.
+
+- Discover/default/remove and protocol checks passed. Workflow run lost the local service (connection refused); restarted via foreground npm start and all3 workflow checks pass. Visual inspection also found empty Watch mistakenly showing source-loading recovery controls; source effect now treats empty as no-source and regression covers this.

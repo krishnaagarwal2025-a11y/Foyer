@@ -167,3 +167,5 @@ Final empty-Watch verification: 60 unit/integration checks and 16 local browser 
 The purple theme pairs a stronger Create action with a softer Join action and illustrated light-mode artwork. A rolling record marks actual connection/join/lazy-load requests without artificial delays. Room-tool transitions preserve playback; reduced-motion preferences disable these animations.
 
 YouTube songs in Listen mode show a vinyl with the song thumbnail in its center, alongside the visible official player and controls. On narrow screens they stack. YouTube remains an official embed; the application does not extract audio or conceal provider video.
+
+Rooms open on Discover by default; navigation order is Discover, Room, People. Queue removal uses a compact44px square next to voting controls. Empty Watch rooms show no loading/recovery prompt until a source is selected.

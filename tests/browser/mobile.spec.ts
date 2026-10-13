@@ -47,6 +47,7 @@ test("phone layouts fit at 320–430px and landscape while songs, sync and chat 
       .getByRole("button", { name: code ? "Join room →" : "＋ Create a room" })
       .click();
     if (!code) await loadDemo(page);
+    await page.getByRole("button", {name:"Room",exact:true}).click();
     await expect(
       page.getByRole("heading", { name: "Cinema Color Journey", level: 1 }),
     ).toBeVisible();

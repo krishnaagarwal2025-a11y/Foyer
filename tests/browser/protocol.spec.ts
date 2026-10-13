@@ -9,6 +9,7 @@ const enter = async (page: Page, name: string, code?: string) => {
   await expect(button).toBeEnabled();
   await button.click();
   if (!code) await loadDemo(page);
+    await page.getByRole("button", {name:"Room",exact:true}).click();
   await expect(page.locator("video")).toBeVisible();
   return new URL(page.url()).searchParams.get("room")!;
 };
