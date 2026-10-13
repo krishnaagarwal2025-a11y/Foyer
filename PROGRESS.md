@@ -182,3 +182,4 @@ Scope: browser/phone emulation can reproduce Foyer-induced repeated seeks and fa
 
 ## Headline animation
 - Add staggered headline entrance and subtle theme-aware purple shimmer. Preserve accessible heading label and static text for reduced motion. Build and desktop/phone browser check next.
+- Headline runtime 7b66a49 deployed as dpl_7H6PBY21CutD512rkDiuwrTsEwUc. Build passes; local shimmer advancement, both themes, 320px fit and reduced-motion checked. Initial probe assumed dark default but OS-selected light; corrected theme selection and rerun passed. Live animation/reduced-motion checks pass; screenshots inspected.
