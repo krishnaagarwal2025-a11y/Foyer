@@ -982,10 +982,10 @@ function App() {
         <main className="welcome" inert={joining}>
           <div className="hero-copy">
             <div className="eyebrow">WATCH / LISTEN / TOGETHER</div>
-            <h1>
-              Your music.
+            <h1 aria-label="Your music. Your people.">
+              <span className="hero-title-line">Your music.</span>
               <br />
-              Your people.
+              <span className="hero-title-line">Your people.</span>
             </h1>
             <p>
               Start a room, invite friends, and share the same playback. Music,

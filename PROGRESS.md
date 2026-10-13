@@ -179,3 +179,6 @@ Scope: browser/phone emulation can reproduce Foyer-induced repeated seeks and fa
 ## Distinct room-code characters
 - User requested a code font that distinguishes O and 0. Bundle OFL-licensed JetBrains Mono and apply its zero variant to displayed room codes and the invitation-code input, keeping a monospace fallback. Build and desktop/mobile visual check next.
 - Font runtime c35a5f5 deployed as dpl_93oCUKcjEwmJ6fWsuzCgD8XL6MfD. Build passes; local invitation input/header zero variant and 320px layout checked. Live font loads successfully with zero feature enabled. Screenshot visually inspected. No external font request required for room codes.
+
+## Headline animation
+- Add staggered headline entrance and subtle theme-aware purple shimmer. Preserve accessible heading label and static text for reduced motion. Build and desktop/phone browser check next.

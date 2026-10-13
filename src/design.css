@@ -901,3 +901,20 @@ details,
  font-feature-settings: "zero" 1;
  letter-spacing: 0.08em;
 }
+
+.hero-title-line {
+ display: inline-block;
+ background: linear-gradient(110deg, #d5b4f0 35%, #f4e8ff 48%, #d5b4f0 61%);
+ background-size: 240% 100%;
+ background-clip: text;
+ -webkit-background-clip: text;
+ -webkit-text-fill-color: transparent;
+ animation: headline-reveal 650ms cubic-bezier(.2,.7,.2,1) both, headline-shimmer 6s linear infinite;
+}
+.hero-title-line:last-child { animation-delay: 140ms, 140ms; }
+:root[data-theme="light"] .hero-title-line { background-image: linear-gradient(110deg, #643782 35%, #8b4da0 48%, #643782 61%); }
+@keyframes headline-reveal { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes headline-shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+@media (prefers-reduced-motion: reduce) {
+ .hero-title-line { animation: none; background: none; -webkit-text-fill-color: currentColor; }
+}
