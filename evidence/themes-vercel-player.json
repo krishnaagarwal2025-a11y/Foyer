@@ -1,0 +1,103 @@
+{
+  "timestamp": "2026-10-13T06:53:29.400Z",
+  "url": "https://foyer-cyan.vercel.app",
+  "participants": 10,
+  "browser": "156.0.8078.4",
+  "contexts": "Separate isolated browser contexts, one Chromium instance",
+  "headless": true,
+  "flags": [
+    "--autoplay-policy=no-user-gesture-required",
+    "--disable-background-timer-throttling",
+    "--disable-renderer-backgrounding",
+    "--disable-backgrounding-occluded-windows"
+  ],
+  "warmupCommands": 6,
+  "commands": 30,
+  "method": "Start: actual host command dispatch in app. Delivery: recipient Socket.IO state handler. Applied: first non-seeking video sample matching paused state and within 500ms of authoritative timeline, with a state version at least as new as the command. Browser clocks calibrated to a single Node monotonic clock using minimum RTT of 7 Playwright evaluations per page. Application sampled on command, playing/seeked/canplay events and each 100ms correction tick. Drift measured from HTML5 currentTime at least one second after each control; offset from app ping estimator via read-only clock telemetry.",
+  "calibrationRoundTripMs": {
+    "samples": 10,
+    "p50": 2.4064999999991414,
+    "p95": 2.9607999999998356,
+    "maximum": 2.9607999999998356
+  },
+  "eventDeliveryMs": {
+    "samples": 270,
+    "p50": 51.54535000894248,
+    "p95": 144.76144999999815,
+    "maximum": 332.20895000894234
+  },
+  "playerApplicationMs": {
+    "samples": 270,
+    "p50": 151.84535000596225,
+    "p95": 315.1446000089418,
+    "maximum": 351.4614500029784
+  },
+  "byControlType": {
+    "play": {
+      "deliveryMs": {
+        "samples": 90,
+        "p50": 114.50894999106094,
+        "p95": 172.145350002982,
+        "maximum": 332.20895000894234
+      },
+      "applicationMs": {
+        "samples": 90,
+        "p50": 271.28960001191444,
+        "p95": 334.9895999999935,
+        "maximum": 351.4614500029784
+      }
+    },
+    "pause": {
+      "deliveryMs": {
+        "samples": 90,
+        "p50": 44.84394998807693,
+        "p95": 70.58440000893461,
+        "maximum": 71.36145000893885
+      },
+      "applicationMs": {
+        "samples": 90,
+        "p50": 151.84535000596225,
+        "p95": 185.26144999999815,
+        "maximum": 200.18440000297414
+      }
+    },
+    "seek": {
+      "deliveryMs": {
+        "samples": 90,
+        "p50": 48.561450011926354,
+        "p95": 72.0089500059621,
+        "maximum": 89.14535000298201
+      },
+      "applicationMs": {
+        "samples": 90,
+        "p50": 70.88960000595398,
+        "p95": 94.78959999701328,
+        "maximum": 109.26144999999815
+      }
+    }
+  },
+  "absoluteDriftMs": {
+    "samples": 300,
+    "p50": 20.029089843749404,
+    "p95": 63.474441406253135,
+    "maximum": 148.9761152343725
+  },
+  "missingDeliverySamples": 0,
+  "missingApplicationSamples": 0,
+  "failures": [],
+  "environment": {
+    "os": "Windows_NT 10.0.26200",
+    "node": "v24.15.0",
+    "cpu": "AMD Ryzen 5 5500U with Radeon Graphics         ",
+    "logicalCpus": 12,
+    "totalMemoryGB": 15.339912414550781,
+    "freeMemoryGB": 3.3441619873046875,
+    "loadAverage": [
+      0,
+      0,
+      0
+    ]
+  },
+  "limitations": "All clients share one measurement machine; deployment URL identifies loopback versus public hosting. Autoplay allowed by test flag and audio muted. Background throttling disabled. Player application criterion is state/timeline, not frame presentation timestamp. Clock calibration uncertainty approximately half calibration RTT. Windows load average does not reflect CPU load.",
+  "passed": true
+}

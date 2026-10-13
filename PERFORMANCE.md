@@ -1,6 +1,6 @@
 # Measured performance
 
-Final runs: **12 October 2026, Asia/Calcutta**. Raw JSON retains UTC timestamps. The first table records **localhost/loopback on one machine**. A separate public Vercel run is recorded below; neither is a physical LAN test.
+Historical baseline: **12 October 2026, Asia/Calcutta**. Current theme/host-sync measurements dated **13 October** appear at the end. Raw JSON retains UTC timestamps. The first table records **localhost/loopback on one machine**. Separate public Vercel runs are recorded below; none is a physical LAN test.
 
 | Measurement | Samples | p50 | p95 | Maximum |
 |---|---:|---:|---:|---:|
@@ -157,3 +157,23 @@ Final public runtime `f956ff7` also passes the real provider switch check (`evid
 Raw current trials: `evidence/host-sync-local-browser.json`. The first run is retained as `host-sync-local-before-catchup.json`: estimated drift p95 152.67ms, maximum 374.59ms. A one-time native catch-up after start reduces decode/start delay; unsupported provider SDKs retain their bounded seek strategy. A 0ms paused API reading is not independent evidence of exactly synchronized clocks, decoded/presented frames or audio output. The 80ms admission tolerance is an API-level readiness check, while output depends on browser/device/network behavior.
 
 The full paused handshake is intentionally distinct from normal control-event delivery and can take seconds if a participant is loading, seeking or blocked. It is not described as a ≤250ms transport result. A missing device holds the room paused; timeout, cancellation, stale/source/host/audience changes cannot produce a false successful resume. Public Internet measurements and normal event delivery benchmarks are recorded separately.
+
+## Current public host-sync results (13 October 2026)
+
+Runtime `076cc98` is deployed to https://foyer-cyan.vercel.app (`dpl_H6JNCzP5wy4BLdgiQAiob9FyrGE4`). The same Windows measurement machine reached the public Mumbai-region backend over the Internet, using isolated Chromium contexts and the actual bundled audio/video. No physical LAN, separate devices, artificial network throttling, frame presentation or audio output was measured.
+
+| Public Internet measurement | Samples | p50 | p95 | Maximum |
+|---|---:|---:|---:|---:|
+| Ten socket clients: host emission → recipient state (synthetic readiness) | 810 | 41.76ms | 103.60ms | 226.17ms |
+| Ten isolated video browsers: actual host dispatch → recipient state | 270 | 51.55ms | 144.76ms | 332.21ms |
+| Ten isolated video browsers: matching player-state application | 270 | 151.85ms | 315.14ms | 351.46ms |
+| Ten isolated video browsers: normal control corrected drift | 300 | 20.03ms | 63.47ms | 148.98ms |
+| Ten actual players: host pause / readiness / commit, excluding scheduled hold | 10 | 253.24ms | 1141.57ms | 1141.57ms |
+| Reported paused API-position alignment | 100 | 0ms | 0ms | 0ms |
+| Estimated resumed video/audio playhead drift | 300 | 52.69ms | 67.31ms | 88.39ms |
+
+Raw reports: `evidence/themes-vercel-socket.json`, `evidence/themes-vercel-player.json` and `evidence/host-sync-vercel-browser.json`. Five video and five audio synchronization trials all observed the pause barrier and automatic resume, with no page errors. Normal delivery meets its p95 target; sampled drift meets its ≤500ms target under these conditions. The normal player run used 30 Play/Pause/Seek commands after six warm-ups, with no missing delivery/application samples or recorded failures; minimum-RTT calibration uncertainty was approximately 1.48ms. Application includes the scheduled start hold and has its own higher p95; the full readiness wait is also a separate operation and intentionally exceeds 250ms. A paused API report of 0ms does not establish zero clock or output error.
+
+The public-target suite passes all 11 browser checks: ten use the public app/backend (including held-device readiness, cancellation, host-only authority, timeout/offline feedback, theme persistence, rapid song changes, mobile audio/chat, social features and late joining); the injected metadata/player music-search check intentionally runs an isolated local app. Official YouTube API fixtures are also distinguished from actual provider playback. Phone layout evidence is `evidence/themes-mobile-vercel.json` (17 overflow checks); this is touch emulation rather than physical phone/Safari verification.
+
+Actual anonymous YouTube Music search returned 20 Finding Her results; selection played the visible official embed without a second tab or copied link. `evidence/music-search-vercel-repeat-2.json` records three successful successive host handshakes and decoded 480×480 playback with no page errors. The first probe timed out waiting for sync-success feedback (`music-search-vercel-first.json`); another repeat timed out waiting for the provider video element (`music-search-vercel-repeat.json`). These failures are retained, their original root cause was not captured, and provider checks now retain UI/state diagnostics on failure. Successful retries do not certify continuous provider availability, every song's embedding permission, or zero playback error. Native ten-player results are separate from this one-player provider smoke test.

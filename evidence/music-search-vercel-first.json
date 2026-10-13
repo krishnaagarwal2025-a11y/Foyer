@@ -1,0 +1,19 @@
+{
+  "url": "https://foyer-cyan.vercel.app",
+  "query": "finding her",
+  "startedAt": "2026-10-13T06:43:45.488Z",
+  "passed": false,
+  "pageErrors": [],
+  "conditions": "Actual anonymous YouTube Music metadata search and official YouTube embed playback, one touch-emulated Chromium client with autoplay allowed. No other tab, copied URL, API key, account, audio extraction or media proxy. Not physical mobile/Safari or a multi-device timing benchmark.",
+  "searchResults": 20,
+  "selectedTitle": "Finding Her",
+  "beforeSync": {
+    "position": 2.52969,
+    "paused": false,
+    "readyState": 4,
+    "videoWidth": 480,
+    "videoHeight": 480
+  },
+  "error": "page.waitForFunction: Timeout 18000ms exceeded.",
+  "completedAt": "2026-10-13T06:44:15.417Z"
+}

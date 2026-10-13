@@ -12,13 +12,19 @@ const report = {
 const browser = await chromium.launch({
   args: ["--autoplay-policy=no-user-gesture-required"],
 });
+let page;
 try {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
     isMobile: true,
     hasTouch: true,
   });
-  const page = await context.newPage();
+  page = await context.newPage();
+  await page.addInitScript(() => {
+    window.addEventListener("watchparty:state", (event) => {
+      window.foyerMusicCheckState = event.detail.room;
+    });
+  });
   page.on("pageerror", (error) => report.pageErrors.push(error.message));
   await page.goto(report.url);
   await page.getByLabel("Display name").fill("Live music search check");
@@ -49,18 +55,40 @@ try {
     videoWidth: v.videoWidth,
     videoHeight: v.videoHeight,
   }));
-  await page.getByRole("button", { name: "Sync room" }).click();
-  await page.waitForFunction(
-    () =>
-      document
-        .querySelector("#sync-feedback")
-        ?.textContent.includes("devices aligned"),
-    undefined,
-    { timeout: 18000 },
-  );
-  await expect
-    .poll(() => video.evaluate((v) => !v.paused), { timeout: 10000 })
-    .toBe(true);
+  report.syncTrials = [];
+  for (let round = 0; round < 3; round++) {
+    const previous = await page.evaluate(
+      () => window.foyerMusicCheckState?.synchronization?.id,
+    );
+    await page.getByRole("button", { name: "Sync room" }).click();
+    await page.waitForFunction(
+      (previous) =>
+        document
+          .querySelector("#sync-feedback")
+          ?.textContent.includes("devices aligned") &&
+        window.foyerMusicCheckState?.synchronization?.id !== previous &&
+        window.foyerMusicCheckState?.synchronization?.reason === "manual",
+      previous,
+      { timeout: 18000 },
+    );
+    await expect
+      .poll(() => video.evaluate((v) => !v.paused && v.readyState >= 2), {
+        timeout: 10000,
+      })
+      .toBe(true);
+    report.syncTrials.push({
+      round: round + 1,
+      check: await page.evaluate(
+        () => window.foyerMusicCheckState?.synchronization,
+      ),
+      actualMedia: await video.evaluate((v) => ({
+        position: v.currentTime,
+        paused: v.paused,
+        readyState: v.readyState,
+      })),
+    });
+    await page.waitForTimeout(500);
+  }
   report.syncFeedback = await page.locator("#sync-feedback").textContent();
   report.tabs = context.pages().length;
   report.afterSync = await video.evaluate((v) => ({
@@ -77,6 +105,18 @@ try {
   report.passed = report.tabs === 1 && !report.pageErrors.length;
 } catch (error) {
   report.error = String(error.message).split("\n")[0];
+  report.diagnostics = await page
+    ?.evaluate(() => ({
+      feedback: document.querySelector("#sync-feedback")?.textContent,
+      alerts: [...document.querySelectorAll('[role="alert"]')].map(
+        (e) => e.textContent,
+      ),
+      url: location.href,
+      visibleText: document.body.innerText.slice(0, 5000),
+      frames: [...document.querySelectorAll("iframe")].map((f) => f.src),
+      room: window.foyerMusicCheckState,
+    }))
+    .catch(() => null);
 } finally {
   await browser.close();
   report.completedAt = new Date().toISOString();
