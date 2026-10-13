@@ -13,6 +13,8 @@ async function installYouTube(context: BrowserContext) {
       commands: [],
       blocked: false,
       deferredMethods: false,
+      playDelayMs: 500,
+      seekDelayMs: 200,
     });
     window.addEventListener("watchparty:command", (event) =>
       fixture.commands.push((event as CustomEvent).detail.command),
@@ -68,7 +70,7 @@ async function installYouTube(context: BrowserContext) {
           }
           clearTimeout(this.timer);
           this.emit(3);
-          this.timer = setTimeout(() => this.emit(1), 500);
+          this.timer = setTimeout(() => this.emit(1), fixture.playDelayMs);
         }
         pauseVideo() {
           clearTimeout(this.timer);
@@ -81,7 +83,10 @@ async function installYouTube(context: BrowserContext) {
           this.anchor = performance.now();
           this.emit(3);
           clearTimeout(this.timer);
-          this.timer = setTimeout(() => this.emit(resume ? 1 : 2), 200);
+          this.timer = setTimeout(
+            () => this.emit(resume ? 1 : 2),
+            fixture.seekDelayMs,
+          );
         }
         getCurrentTime() {
           return (
@@ -130,6 +135,7 @@ const fixtureState = (page: Page) =>
     return {
       state: p?.state,
       plays: p?.plays,
+      seeks: p?.seeks,
       count: f.instances.length,
       position: p?.getCurrentTime(),
       commands: f.commands.filter((c: any) =>
@@ -137,6 +143,64 @@ const fixtureState = (page: Page) =>
       ),
     };
   });
+
+test("slow phone playback is not labelled autoplay-blocked and automatic correction gives buffering time to settle", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  await installYouTube(context);
+  const page = await context.newPage();
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  try {
+    await enter(page, "Slow phone");
+    await page.evaluate(() => {
+      (window as any).youtubeFixture.playDelayMs = 10000;
+      (window as any).youtubeFixture.seekDelayMs = 1200;
+    });
+    await page.locator(".source-panel > summary").click();
+    await page.getByLabel("Custom media title").fill("Slow connection fixture");
+    await page
+      .getByLabel("Custom media URL")
+      .fill("https://www.youtube.com/watch?v=abcdefghijk");
+    await page.getByRole("button", { name: "Load video", exact: true }).click();
+    await expect(page.getByTitle("YouTube API fixture")).toBeVisible();
+    await page.getByRole("button", { name: "Play", exact: true }).click();
+    await page.waitForTimeout(8500);
+    await expect(
+      page.getByRole("button", { name: "Enable playback on this device" }),
+    ).not.toBeVisible();
+    expect((await fixtureState(page)).plays).toBe(1);
+    await expect
+      .poll(async () => (await fixtureState(page)).seeks, { timeout: 12000 })
+      .toBe(1);
+    await page.waitForTimeout(2900);
+    expect((await fixtureState(page)).seeks).toBe(1);
+    expect((await fixtureState(page)).state).toBe(1);
+    // Host intent must not be delayed by the automatic-correction cooldown.
+    await page.getByLabel("Seek playback").fill("40");
+    await expect
+      .poll(async () => (await fixtureState(page)).seeks, { timeout: 2000 })
+      .toBe(2);
+    await expect.poll(async () => (await fixtureState(page)).state).toBe(1);
+    await page.getByRole("button", { name: "Sync room" }).click();
+    await expect(page.locator("#sync-feedback")).toContainText(
+      "All 1 devices aligned",
+      { timeout: 18000 },
+    );
+    expect(errors).toEqual([]);
+    await page.screenshot({
+      path: "evidence/phone-buffer-recovery.png",
+      fullPage: true,
+    });
+  } finally {
+    await context.close();
+  }
+});
 
 test("YouTube buffering settles, native host actions synchronize, retry rebuilds and Music links join Listen", async ({
   browser,

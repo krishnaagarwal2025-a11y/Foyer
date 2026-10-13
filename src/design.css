@@ -308,14 +308,23 @@ details,
 }
 .movie-art {
   border-radius: 2px;
-  background: var(--movie-color);
+  background:
+    radial-gradient(ellipse at 90% 0%, var(--movie-color), transparent 65%),
+    linear-gradient(140deg, #363143, #111017);
+  color: #fff;
 }
-.movie-art::before,
 .movie-art::after {
-  display: none;
+  display: block;
 }
 .movie-art span {
-  color: #151515;
+  color: #f0dcff;
+}
+.poster-scene {
+  margin-top: 30px;
+  border-radius: 4px;
+}
+.scene-caption {
+  right: 24px;
 }
 .movie h3 {
   color: var(--text);

@@ -1,0 +1,79 @@
+{
+  "checkedAt": "2026-10-13T07:26:09.801Z",
+  "url": "http://localhost:3001",
+  "passed": true,
+  "readings": [
+    {
+      "position": 3.441622,
+      "paused": false,
+      "readyState": 4,
+      "waitingEvents": 0,
+      "absoluteDriftMs": 29.11896679687498
+    },
+    {
+      "position": 3.140983,
+      "paused": false,
+      "readyState": 4,
+      "waitingEvents": 0,
+      "absoluteDriftMs": 341.84561328124994
+    },
+    {
+      "position": 5.47773,
+      "paused": false,
+      "readyState": 4,
+      "waitingEvents": 0,
+      "absoluteDriftMs": 31.310771484374555
+    },
+    {
+      "position": 5.264627,
+      "paused": false,
+      "readyState": 4,
+      "waitingEvents": 0,
+      "absoluteDriftMs": 253.3014667968754
+    },
+    {
+      "position": 7.502533,
+      "paused": false,
+      "readyState": 4,
+      "waitingEvents": 0,
+      "absoluteDriftMs": 19.44698046875004
+    },
+    {
+      "position": 7.373815,
+      "paused": false,
+      "readyState": 4,
+      "waitingEvents": 0,
+      "absoluteDriftMs": 177.2135644531252
+    },
+    {
+      "position": 9.531909,
+      "paused": false,
+      "readyState": 4,
+      "waitingEvents": 0,
+      "absoluteDriftMs": 25.570980468749838
+    },
+    {
+      "position": 9.460946,
+      "paused": false,
+      "readyState": 4,
+      "waitingEvents": 0,
+      "absoluteDriftMs": 126.28251562500026
+    },
+    {
+      "position": 11.568001,
+      "paused": false,
+      "readyState": 4,
+      "waitingEvents": 0,
+      "absoluteDriftMs": 6.815650390624484
+    },
+    {
+      "position": 11.509616,
+      "paused": false,
+      "readyState": 4,
+      "waitingEvents": 0,
+      "absoluteDriftMs": 99.81246679687494
+    }
+  ],
+  "pageErrors": [],
+  "conditions": "Two isolated touch-emulated Chromium contexts, autoplay allowed, actual AAC local audio. After loading the application, each page's HTTP requests are CDP-throttled to 100kbps download, 50kbps upload, 200ms latency before joining. This isolates media streaming rather than full application startup; not proof of WebSocket latency, physical mobile/Safari or real cellular packet-loss behavior. Waiting events counted after playback reached one second; drift uses the app's four-timestamp server-clock estimate."
+}

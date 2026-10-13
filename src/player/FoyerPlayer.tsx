@@ -6,6 +6,7 @@ import React, {
   useRef,
 } from "react";
 import type { Movie } from "../../shared/types";
+import { ProviderRecovery } from "./ProviderRecovery";
 export interface PlaybackHandle {
   currentTime: number;
   duration: number;
@@ -17,6 +18,7 @@ export interface PlaybackHandle {
   muted: boolean;
   playbackRate: number;
   readonly supportsRate?: boolean;
+  readonly correctionReady?: boolean;
   play(): Promise<void>;
   pause(): void;
   load(): void;
@@ -208,7 +210,20 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
                 error("This browser does not support HLS playback.");
                 return;
               }
-              const hls = new Hls({ enableWorker: true });
+              const mobile = matchMedia("(pointer: coarse)").matches;
+              const hls = new Hls({
+                enableWorker: true,
+                capLevelToPlayerSize: true,
+                backBufferLength: 15,
+                ...(mobile
+                  ? {
+                      maxBufferLength: 20,
+                      maxMaxBufferLength: 40,
+                      maxBufferSize: 20 * 1024 * 1024,
+                      abrEwmaDefaultEstimate: 500000,
+                    }
+                  : {}),
+              });
               hls.loadSource(m.url!);
               hls.attachMedia(el);
               adapter.current = new Proxy(el as PlaybackHandle, {
@@ -258,7 +273,9 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
           loaded = false,
           seeking = false,
           buffering = false,
+          nativeSeekPending = false,
           isMuted = props.muted;
+        const recovery = new ProviderRecovery();
         let play = async () => {},
           pause = () => {},
           seek = (_t: number) => {},
@@ -271,6 +288,7 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
           },
           set currentTime(t) {
             seeking = true;
+            recovery.sought();
             seek(t);
           },
           get duration() {
@@ -290,6 +308,10 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
           },
           get buffering() {
             return buffering;
+          },
+          get correctionReady() {
+            recovery.observeBuffering(buffering);
+            return !seeking && !nativeSeekPending && recovery.correctionReady;
           },
           get muted() {
             return isMuted;
@@ -365,6 +387,8 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
             let commandUntil = 0;
             let seekTarget: number | undefined;
             let seekDeadline = 0;
+            let previousReadAt = performance.now();
+            let previousReadPlaying = false;
             const settlePlay = (failure?: Error) => {
               clearTimeout(playTimeout);
               const resolve = finishPlay,
@@ -389,6 +413,7 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
                 onStateChange: (e: { data: number }) => {
                   if (disposed || unavailable) return;
                   buffering = e.data === 3;
+                  recovery.observeBuffering(buffering);
                   if (e.data === 1) {
                     paused = false;
                     settlePlay();
@@ -442,13 +467,14 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
                 failPlay = reject;
               });
               playTimeout = setTimeout(() => {
-                buffering = false;
-                settlePlay(
-                  Error(
-                    "Playback did not start. Click to sync and play, or check the video's availability.",
-                  ),
+                const failure = Error(
+                  "Buffering is taking longer than usual. Check your connection or retry the source.",
                 );
-              }, 8000);
+                failure.name = "TimeoutError";
+                // A slow connection is not an autoplay denial. Keep observed
+                // buffering intact and let a late playing event recover.
+                settlePlay(failure);
+              }, 30000);
               const request = pendingPlay;
               player.playVideo();
               return request;
@@ -461,6 +487,7 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
               player.pauseVideo();
             };
             seek = (t) => {
+              nativeSeekPending = false;
               seekTarget = t;
               seekDeadline = performance.now() + 3000;
               commandUntil = performance.now() + 1500;
@@ -469,12 +496,28 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
             volume = (v) => (v ? player.mute() : player.unMute());
             query = () => {
               const previous = position;
+              const readAt = performance.now();
+              const naturalAdvance = previousReadPlaying
+                ? (readAt - previousReadAt) / 1000
+                : 0;
+              previousReadAt = readAt;
               position = player.getCurrentTime() || 0;
               duration = player.getDuration() || duration;
               const state = player.getPlayerState();
+              previousReadPlaying = state === 1;
               buffering = state === 3;
+              recovery.observeBuffering(buffering);
               if (state === 1) paused = false;
               else if ([0, 2, 5, -1].includes(state)) paused = true;
+              // Do not discard a user jump observed while a recent play/seek
+              // transition is protected. Hold correction until the SDK settles,
+              // then reconcile the native seek once with room permissions.
+              if (
+                loaded &&
+                !seeking &&
+                Math.abs(position - previous - naturalAdvance) > 1.5
+              )
+                nativeSeekPending = true;
               if (
                 seekTarget !== undefined &&
                 !buffering &&
@@ -483,13 +526,14 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
               ) {
                 seekTarget = undefined;
                 completeSeek();
-              } else if (
+              }
+              if (
+                nativeSeekPending &&
                 !seeking &&
-                loaded &&
                 !buffering &&
-                performance.now() > commandUntil &&
-                Math.abs(position - previous) > 1.5
+                performance.now() > commandUntil
               ) {
+                nativeSeekPending = false;
                 callbacks.current.onProviderControl("seek", position);
               }
             };

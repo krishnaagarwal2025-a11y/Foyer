@@ -6,7 +6,18 @@ export default defineConfig({
   use: {
     baseURL: process.env.DEMO_URL || "http://127.0.0.1:5173",
     headless: true,
-    launchOptions: { args: ["--autoplay-policy=no-user-gesture-required"] },
+    launchOptions: {
+      args: [
+        "--autoplay-policy=no-user-gesture-required",
+        ...(process.env.LOW_MEMORY === "1"
+          ? [
+              "--disable-gpu",
+              "--renderer-process-limit=2",
+              "--js-flags=--max-old-space-size=64 --max-semi-space-size=1",
+            ]
+          : []),
+      ],
+    },
     screenshot: "only-on-failure",
   },
   ...(!process.env.DEMO_URL

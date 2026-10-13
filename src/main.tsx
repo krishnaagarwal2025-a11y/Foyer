@@ -120,6 +120,7 @@ function App() {
     videoErrorRef = useRef(""),
     priming = useRef(false),
     resumedRoomCheck = useRef<string | undefined>(undefined),
+    correctedProviderSeek = useRef<string | undefined>(undefined),
     resume = useRef<{ code: string; name: string } | null>(null),
     loadedRevision = useRef(-1),
     manualSync = useRef<{
@@ -366,6 +367,7 @@ function App() {
               v.readyState >= 2 &&
               !v.seeking &&
               !v.buffering &&
+              v.correctionReady !== false &&
               Math.abs(v.currentTime - packet.targetPosition!) > 0.01
             )
               v.currentTime = packet.targetPosition!;
@@ -559,7 +561,12 @@ function App() {
       // immediately on packet receipt and recreating inter-device latency.
       if (!v.paused) v.pause();
       v.playbackRate = 1;
-      if (!v.seeking && !v.buffering && Math.abs(delta) > 0.15) {
+      if (
+        !v.seeking &&
+        !v.buffering &&
+        v.correctionReady !== false &&
+        Math.abs(delta) > 0.15
+      ) {
         try {
           v.currentTime = expected;
         } catch {}
@@ -597,7 +604,7 @@ function App() {
             const needsClick =
               (failure instanceof Error &&
                 failure.name === "NotAllowedError") ||
-              /autoplay|blocked|did not start/i.test(message);
+              /autoplay|blocked/i.test(message);
             blockedRef.current = needsClick;
             setBlocked(needsClick);
             if (!needsClick) setVideoError(message);
@@ -637,7 +644,15 @@ function App() {
       fix.rate = 1;
       if (!force) fix.seek = Math.abs(delta) > (r.playing ? 0.4 : 0.15);
     }
-    if (fix.seek) {
+    const explicitProviderSeek =
+      v.supportsRate === false &&
+      r.lastOperation?.type === "seek" &&
+      correctedProviderSeek.current !== r.lastOperation.id;
+    if (explicitProviderSeek) {
+      fix.seek = Math.abs(delta) > 0.02;
+      correctedProviderSeek.current = r.lastOperation!.id;
+    }
+    if (fix.seek && (explicitProviderSeek || v.correctionReady !== false)) {
       try {
         v.currentTime = Math.min(expected, v.duration || expected);
       } catch {}
@@ -960,25 +975,14 @@ function App() {
               <span>✦ Shared discovery</span>
               <span>♡ Live reactions</span>
             </div>
-            <div className="landing-records" aria-hidden="true">
-              <div className="sleeve sleeve-one">
-                <span>01</span>
-                <strong>
-                  FOYER
-                  <br />
-                  SESSIONS
-                </strong>
-                <small>A listening room</small>
-              </div>
-              <div className="sleeve sleeve-two">
-                <span>02</span>
-                <strong>
-                  AFTER
-                  <br />
-                  HOURS
-                </strong>
-                <small>A watch room</small>
-              </div>
+            <div className="poster-scene" aria-hidden="true">
+              <div className="scene-orbit"></div>
+              <span className="scene-caption">
+                NOW SHOWING
+                <br />
+                <strong>A place to press play together.</strong>
+              </span>
+              <span className="scene-badge">WATCH · LISTEN · BELONG</span>
             </div>
           </div>
           <section className="entry-card">
