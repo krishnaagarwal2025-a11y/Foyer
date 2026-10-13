@@ -163,3 +163,5 @@ Run `npm run test:browser -- tests/browser/phone-network.spec.ts tests/browser/y
 Watch rooms now open with an empty screen. Add a link or select a playable title in Discover before using playback controls. The local demo is optional; existing rooms retain their selected media. Listen rooms retain their audio default.
 
 Final empty-Watch verification: 60 unit/integration checks and 16 local browser checks pass. Current performance evidence and provider/network limitations are recorded in PERFORMANCE.md; tests choose the optional demo explicitly.
+
+The purple theme pairs a stronger Create action with a softer Join action and illustrated light-mode artwork. A rolling record marks actual connection/join/lazy-load requests without artificial delays. Room-tool transitions preserve playback; reduced-motion preferences disable these animations.

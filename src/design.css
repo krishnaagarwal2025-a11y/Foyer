@@ -9,9 +9,9 @@
   --text: #f0f1ed;
   --muted: #a1a6a8;
   --line: #34383c;
-  --accent: #c4dfa0;
-  --accent-text: #172415;
-  --accent-soft: #263323;
+  --accent: #b98adb;
+  --accent-text: #21102c;
+  --accent-soft: #302238;
   --danger: #ef9c93;
   background: var(--page);
   color: var(--text);
@@ -25,9 +25,9 @@
   --text: #202522;
   --muted: #5b6661;
   --line: #d1d7d1;
-  --accent: #245b3d;
+  --accent: #6d3d91;
   --accent-text: #ffffff;
-  --accent-soft: #e3eee2;
+  --accent-soft: #efe6f5;
   --danger: #a22b22;
   background: var(--page);
   color: var(--text);
@@ -645,5 +645,173 @@ details,
   }
   .song-link-fallback summary {
     min-height: 44px;
+  }
+}
+
+/* Purple artwork supplies the landing hierarchy in both themes. */
+.hero-copy h1 {
+  color: #d5b4f0;
+}
+.entry-card .secondary {
+  background: var(--accent-soft);
+  border-color: #79518e;
+  color: #e0c5ef;
+}
+.entry-card .secondary:hover:enabled {
+  background: #412b50;
+  border-color: var(--accent);
+}
+:root[data-theme="light"] .hero-copy h1 {
+  color: #643782;
+}
+:root[data-theme="light"] .entry-card .secondary {
+  color: #643782;
+  border-color: #b99acb;
+}
+:root[data-theme="light"] .entry-card .secondary:hover:enabled {
+  background: #e5d5ef;
+}
+:root[data-theme="light"] .poster-scene {
+  background:
+    radial-gradient(ellipse at 65% 120%, #f6b9a0 0, transparent 45%),
+    radial-gradient(ellipse at 60% 100%, #c9a4e0, transparent 65%), #f1e7f7;
+  border-color: #c7acd7;
+}
+:root[data-theme="light"] .scene-orbit {
+  border-color: #9865b2;
+  box-shadow:
+    0 0 0 25px #a579be18,
+    0 0 0 50px #a579be0c;
+}
+:root[data-theme="light"] .scene-caption,
+:root[data-theme="light"] .scene-caption strong,
+:root[data-theme="light"] .scene-badge {
+  color: #502e69;
+}
+.welcome,
+.room-layout {
+  animation: page-arrive 260ms ease-out both;
+}
+.sidebar-page:not([hidden]),
+.tab-content,
+.social .chat-messages {
+  animation: page-arrive 180ms ease-out both;
+}
+@keyframes page-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.disc-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  min-height: 200px;
+  padding: 32px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: center;
+}
+.disc-loader p {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+.disc-loader-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  min-height: 100dvh;
+  background: var(--page);
+  animation: loader-arrive 120ms ease-out;
+}
+@keyframes loader-arrive {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.loading-disc {
+  width: 112px;
+  height: 112px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid #54505c;
+  background: repeating-radial-gradient(
+    circle,
+    #19161e 0 2px,
+    #34303c 3px,
+    #19161e 4px 6px
+  );
+  box-shadow: 0 8px 24px #0002;
+  position: relative;
+  animation: disc-roll 1.6s linear infinite;
+}
+.loading-disc::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 20deg,
+    transparent 0deg,
+    #ffffff24 45deg,
+    transparent 80deg 180deg,
+    #ffffff18 225deg,
+    transparent 270deg
+  );
+}
+.disc-label {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: grid;
+  place-items: center;
+  z-index: 1;
+  border: 1px solid #ffffff30;
+}
+.disc-label::before {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 1px;
+  background: var(--accent-text);
+  transform: translateY(-10px);
+}
+.disc-label i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--page);
+  border: 1px solid #ffffff30;
+}
+@keyframes disc-roll {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .welcome,
+  .room-layout,
+  .sidebar-page:not([hidden]),
+  .tab-content,
+  .social .chat-messages,
+  .disc-loader-screen,
+  .loading-disc {
+    animation: none;
+  }
+  button,
+  .theme-toggle {
+    transition: none;
   }
 }

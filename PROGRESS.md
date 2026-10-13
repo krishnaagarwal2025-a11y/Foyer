@@ -163,3 +163,8 @@ Scope: browser/phone emulation can reproduce Foyer-induced repeated seeks and fa
 - Runtime 28a6d96 pushed to main and deployed to https://foyer-cyan.vercel.app as dpl_Bnis971ZMHREfhHEaq8RDVkD3B9w. All 16 local browser checks pass and final unit run is 60/60. Public regression checks in progress. New socket benchmark p95 16.60ms; ten-browser reruns crashed before samples, retained honestly. Live provider attempt failed readiness; local deterministic handshake recovery checks pass.
 
 - Final public-target checks 8/8 pass (7 public, 1 isolated injected application). Public slow-HTTP two-phone AAC check records zero post-start waiting events. Final source type-check passes; local and public health return200. Only remote main remains.
+
+## Purple theme and motion polish
+- Plan: match create/headline to illustrated purple palette, softer Join hierarchy, light-theme illustration, real join/loading disc and restrained transitions with reduced motion. Implemented; build and targeted browser verification next. Loading adds no artificial delay and does not remount players on navigation.
+
+- Build/type checks and 60 unit/integration tests pass. Desktop/phone theme and disc/navigation checks pass. Existing three multi-client workflows pass. Initial connection overlay exposed a focus race in the automated join test; render the connection loader before the form mounts, then rerun passes (2/2). Retained earlier failed attempt. Screenshots visually inspected; publish and public verification next.

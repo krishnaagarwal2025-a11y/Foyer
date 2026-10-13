@@ -1,0 +1,23 @@
+
+Running 5 tests using 1 worker
+
+  ok 1 tests\browser\visual-polish.spec.ts:2:1 › purple theme hierarchy and illustrated light mode fit desktop and phone (3.6s)
+  x  2 tests\browser\visual-polish.spec.ts:46:1 › real room request displays a rolling disc, errors clear it, and room navigation transitions (1.0m)
+  ok 3 tests\browser\workflows.spec.ts:20:1 › two browsers complete the social and synchronized playback workflow (14.3s)
+  ok 4 tests\browser\workflows.spec.ts:182:1 › invalid invitations, mobile layout and deterministic host replacement (19.2s)
+  ok 5 tests\browser\workflows.spec.ts:215:1 › late join snapshots playback, corrects drift and recovers from a bad source (6.7s)
+
+
+  1) tests\browser\visual-polish.spec.ts:46:1 › real room request displays a rolling disc, errors clear it, and room navigation transitions 
+
+    Test timeout of 60000ms exceeded.
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\visual-polish-real-room-re-a8222-room-navigation-transitions\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\visual-polish-real-room-re-a8222-room-navigation-transitions\error-context.md
+
+  1 failed
+    tests\browser\visual-polish.spec.ts:46:1 › real room request displays a rolling disc, errors clear it, and room navigation transitions 
+  4 passed (1.8m)

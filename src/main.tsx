@@ -26,6 +26,7 @@ import "./provider.css";
 import "./room.css";
 import "./design.css";
 import type { PlaybackHandle } from "./player/FoyerPlayer";
+import { DiscLoader } from "./DiscLoader";
 import { PlayerBoundary } from "./player/PlayerBoundary";
 const FoyerPlayer = lazy(() =>
     import("./player/FoyerPlayer").then((module) => ({
@@ -957,10 +958,17 @@ function App() {
       <span>{theme === "dark" ? "Light" : "Dark"}</span>
     </button>
   );
-  if (!room)
+  if (!room && status === "Connecting")
     return (
       <div className="landing">
-        <header className="site-header">
+        <DiscLoader fullScreen label="Connecting to Foyer…" />
+      </div>
+    );
+  if (!room)
+    return (
+      <div className="landing" aria-busy={joining}>
+        {joining && <DiscLoader fullScreen label="Opening your room…" />}
+        <header className="site-header" inert={joining}>
           <a className="brand" href="/">
             <span>
               F<span className="accent">oyer</span>
@@ -971,7 +979,7 @@ function App() {
           </span>
           {themeControl}
         </header>
-        <main className="welcome">
+        <main className="welcome" inert={joining}>
           <div className="hero-copy">
             <div className="eyebrow">WATCH / LISTEN / TOGETHER</div>
             <h1>
@@ -1170,13 +1178,7 @@ function App() {
                 );
               }}
             >
-              <Suspense
-                fallback={
-                  <div className="provider-loading" role="status">
-                    Loading room player…
-                  </div>
-                }
-              >
+              <Suspense fallback={<DiscLoader label="Loading room player…" />}>
                 <FoyerPlayer
                   key={`${room.mediaRevision}:${playerAttempt}`}
                   ref={video}
@@ -1566,11 +1568,7 @@ function App() {
             >
               {room.settings.mode === "listen" && (
                 <Suspense
-                  fallback={
-                    <div className="panel" role="status">
-                      Loading music discovery…
-                    </div>
-                  }
+                  fallback={<DiscLoader label="Loading music discovery…" />}
                 >
                   <MusicDiscovery
                     command={command}

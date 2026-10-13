@@ -1,0 +1,8 @@
+
+Running 3 tests using 1 worker
+
+  ok 1 tests\browser\empty-watch.spec.ts:3:1 › Watch starts empty and an optional video can be selected (6.0s)
+  ok 2 tests\browser\visual-polish.spec.ts:2:1 › purple theme hierarchy and illustrated light mode fit desktop and phone (3.4s)
+  ok 3 tests\browser\visual-polish.spec.ts:18:1 › real room request displays a rolling disc, errors clear it, and room navigation transitions (4.1s)
+
+  3 passed (16.3s)
