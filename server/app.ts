@@ -13,15 +13,21 @@ import { CloudCoordinator } from "./cloud.js";
 import { RedisRoomStore } from "./redis-store.js";
 import { SyncProtocol } from "./sync-protocol.js";
 import type { PlaybackPreparation } from "./engine.js";
-import type { Result } from "../shared/types.js";
+import type { Result, Synchronization } from "../shared/types.js";
+import { searchYouTube } from "./youtube-search.js";
 
-export async function createApplication({ cloud = false } = {}) {
+export async function createApplication({
+  cloud = false,
+  dataDirectory = "data",
+  syncTimeoutMs = Number(process.env.ROOM_SYNC_TIMEOUT_MS || 10000),
+  musicSearch = searchYouTube,
+} = {}) {
   let db: DatabaseSync | undefined;
   let save: ReturnType<DatabaseSync["prepare"]> | undefined;
   let remove: ReturnType<DatabaseSync["prepare"]> | undefined;
   if (!cloud) {
-    mkdirSync("data", { recursive: true });
-    db = new DatabaseSync("data/watch-party.sqlite");
+    mkdirSync(dataDirectory, { recursive: true });
+    db = new DatabaseSync(path.resolve(dataDirectory, "watch-party.sqlite"));
     db.exec(
       "PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS rooms(code TEXT PRIMARY KEY, snapshot TEXT NOT NULL); CREATE TABLE IF NOT EXISTS movies(id TEXT PRIMARY KEY, metadata TEXT NOT NULL);",
     );
@@ -238,6 +244,7 @@ export async function createApplication({ cloud = false } = {}) {
     app,
     engine,
     store ? (movies) => store!.remember(movies) : undefined,
+    musicSearch,
   );
   app.use("/api", (_req, res) =>
     res.status(404).json({ error: "API route not found." }),
@@ -290,6 +297,80 @@ export async function createApplication({ cloud = false } = {}) {
       const check = await protocol.check(prepared.room, "play");
       return transact(data, { baseline: prepared.room, check });
     };
+    const synchronizeRoom = async (data: unknown): Promise<Result> => {
+      const current = await snapshot();
+      if (!current.ok) return current;
+      const prepared = engine.prepareRoomSync(socket.id, data);
+      if (!prepared.ok || !prepared.room) return prepared;
+      const started = await transact(data);
+      if (!started.ok) return started;
+      const paused = await snapshot(),
+        barrier = paused.room?.syncBarrier;
+      if (!paused.ok || !barrier)
+        return { ok: false, error: "The room sync was cancelled." };
+      const until =
+        performance.now() + Math.max(200, Math.min(12000, syncTimeoutMs));
+      let check: Synchronization | undefined;
+      do {
+        const fresh = await snapshot();
+        if (
+          !fresh.ok ||
+          fresh.room?.syncBarrier?.id !== barrier.id ||
+          fresh.room.syncBarrier.status !== "waiting"
+        )
+          return {
+            ok: false,
+            error: "The room sync was cancelled or the audience changed.",
+          };
+        check = await protocol.check(fresh.room, "manual");
+        if (
+          check.participants.every(
+            (p) =>
+              p.ready &&
+              p.samples === 3 &&
+              p.paused &&
+              !p.autoplayBlocked &&
+              p.alignmentMs !== undefined &&
+              p.alignmentMs <= 80,
+          )
+        )
+          break;
+        if (performance.now() < until)
+          await new Promise((resolve) => setTimeout(resolve, 200));
+      } while (performance.now() < until);
+      const result = await transact(
+        {
+          opId: crypto.randomUUID(),
+          mediaRevision: barrier.mediaRevision,
+          command: { type: "resyncFinish" },
+        },
+        { roomSyncId: barrier.id, check },
+      );
+      const final = await snapshot();
+      return {
+        ...result,
+        room: final.room || result.room,
+        synchronization: check,
+      };
+    };
+    const startRoomSync = (data: unknown, ack: unknown) => {
+      // Do not occupy the socket command queue during readiness waits: the host
+      // must be able to cancel, and disconnect must still clear presence.
+      const task = synchronizeRoom(data)
+        .then((result) => {
+          if (typeof ack === "function") ack(result);
+        })
+        .catch(() => {
+          if (typeof ack === "function")
+            ack({
+              ok: false,
+              error:
+                "Room sync unavailable. Playback remains paused if the handshake began.",
+            });
+        });
+      tasks.add(task);
+      void task.finally(() => tasks.delete(task));
+    };
     socket.on("clock", (_data, ack) => {
       if (typeof ack === "function") ack({ serverTime: engine.now() });
     });
@@ -323,6 +404,10 @@ export async function createApplication({ cloud = false } = {}) {
           ack({ ok: false, error: "Too many commands. Please slow down." });
         return;
       }
+      if (data?.command?.type === "resync") {
+        startRoomSync(data, ack);
+        return;
+      }
       enqueue(async () => {
         try {
           let result: Result;
@@ -332,6 +417,20 @@ export async function createApplication({ cloud = false } = {}) {
               ? await snapshot()
               : undefined;
             result = await transact(data, { deferAutoAdvance: true });
+            if (
+              result.ok &&
+              data?.command?.type === "library" &&
+              !data.command.enqueue &&
+              data.command.start
+            ) {
+              const after = await snapshot();
+              if (after.room)
+                result = await preparedPlay({
+                  opId: crypto.randomUUID(),
+                  mediaRevision: after.room.mediaRevision,
+                  command: { type: "play" },
+                });
+            }
             if (
               result.ok &&
               before?.room &&
@@ -371,35 +470,23 @@ export async function createApplication({ cloud = false } = {}) {
         !data ||
         typeof data !== "object" ||
         Array.isArray(data) ||
-        Object.keys(data).length
+        !/^[\w-]{8,80}$/.test(String(data.opId || "")) ||
+        !Number.isInteger(data.mediaRevision) ||
+        Object.keys(data).some(
+          (key) => !["opId", "mediaRevision"].includes(key),
+        )
       ) {
         ack({ ok: false, error: "Invalid sync request." });
         return;
       }
-      enqueue(async () => {
-        try {
-          const current = await snapshot();
-          if (!current.ok || !current.room) {
-            ack(current);
-            return;
-          }
-          const check = await protocol.check(current.room, "manual");
-          const fresh = await snapshot();
-          if (fresh.room && fresh.room.mediaRevision !== check.mediaRevision) {
-            ack({
-              ok: false,
-              error: "Source changed during the device check. Sync again.",
-            });
-            return;
-          }
-          ack({ ...fresh, synchronization: check });
-        } catch {
-          ack({
-            ok: false,
-            error: "Room storage unavailable. Try syncing again.",
-          });
-        }
-      });
+      startRoomSync(
+        {
+          opId: data.opId,
+          mediaRevision: data.mediaRevision,
+          command: { type: "resync" },
+        },
+        ack,
+      );
     });
     socket.on("disconnect", () =>
       enqueue(async () => {

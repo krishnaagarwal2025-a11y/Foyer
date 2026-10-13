@@ -256,7 +256,7 @@ test("late join snapshots playback, corrects drift and recovers from a bad sourc
         );
     });
     await expect(
-      late.getByRole("button", { name: "Click to sync and play" }),
+      late.getByRole("button", { name: "Enable playback on this device" }),
     ).toBeVisible();
     await late.locator("video").evaluate((v: HTMLVideoElement) => {
       window.addEventListener(
@@ -269,7 +269,9 @@ test("late join snapshots playback, corrects drift and recovers from a bad sourc
         { once: true, capture: true },
       );
     });
-    await late.getByRole("button", { name: "Click to sync and play" }).click();
+    await late
+      .getByRole("button", { name: "Enable playback on this device" })
+      .click();
     await expect
       .poll(() =>
         late.locator("video").evaluate((v: HTMLVideoElement) => v.paused),

@@ -17,6 +17,8 @@ const reply = z.object({
   mediaRevision: z.number().int(),
   ready: z.boolean(),
   autoplayBlocked: z.boolean(),
+  position: z.number().finite().min(0).max(43200).optional(),
+  paused: z.boolean().optional(),
 });
 
 /** Per-device, three concurrent exchanges. Redis Pub/Sub distributes the request
@@ -40,7 +42,7 @@ export class SyncProtocol {
     private publish: (event: CloudEvent) => Promise<void>,
   ) {}
   async check(room: Room, reason: "play" | "manual"): Promise<Synchronization> {
-    const key = `${room.code}:${room.mediaRevision}:${reason}`;
+    const key = `${room.code}:${room.mediaRevision}:${reason}:${room.syncBarrier?.id || ""}`;
     const existing = this.inFlight.get(key);
     if (existing) return existing;
     if (this.checks.size >= 32)
@@ -62,7 +64,14 @@ export class SyncProtocol {
       participants: room.participants
         .filter((p) => p.connected)
         .map((p) => p.id),
-      expiresAt: this.now() + 1500,
+      expiresAt: this.now() + (room.syncBarrier ? 3000 : 1500),
+      ...(reason === "manual" && room.syncBarrier?.status === "waiting"
+        ? {
+            barrierId: room.syncBarrier.id,
+            targetPosition: room.syncBarrier.position,
+            toleranceMs: 80,
+          }
+        : {}),
     };
     let finish!: () => void;
     const done = new Promise<void>((resolve) => {
@@ -74,7 +83,7 @@ export class SyncProtocol {
       finish,
     };
     this.checks.set(job.id, collector);
-    const timer = setTimeout(finish, 1000);
+    const timer = setTimeout(finish, job.barrierId ? 2000 : 1000);
     try {
       await this.publish({ code: job.code, type: "probe", data: job });
       if (!collector.expected.size) finish();
@@ -125,7 +134,10 @@ export class SyncProtocol {
       return;
     if (this.seen.size >= 128) return;
     this.seen.add(job.id);
-    setTimeout(() => this.seen.delete(job.id), 2000).unref();
+    setTimeout(
+      () => this.seen.delete(job.id),
+      job.barrierId ? 4000 : 2000,
+    ).unref();
     const members = await this.members(job.code);
     const peers = [...members].flatMap(([sid, participantId]) => {
       const socket = this.io.sockets.sockets.get(sid);
@@ -158,7 +170,7 @@ export class SyncProtocol {
         try {
           const response = reply.safeParse(
             await socket
-              .timeout(300)
+              .timeout(job.barrierId ? 1500 : 300)
               .emitWithAck("sync-check", { ...job, sequence, serverSentAt }),
           );
           const serverReceivedAt = this.now(),
@@ -185,8 +197,17 @@ export class SyncProtocol {
           return {
             rttMs,
             sentAt: data.clientSentAt,
-            ready: data.mediaRevision === job.mediaRevision && data.ready,
+            ready:
+              data.mediaRevision === job.mediaRevision &&
+              data.ready &&
+              (!job.barrierId ||
+                (data.paused === true &&
+                  data.position !== undefined &&
+                  Math.abs(data.position - job.targetPosition!) * 1000 <=
+                    job.toleranceMs!)),
             autoplayBlocked: data.autoplayBlocked,
+            position: data.position,
+            paused: data.paused,
           };
         } catch {
           return null;
@@ -203,6 +224,11 @@ export class SyncProtocol {
       samples: valid.length,
       ready: latest?.ready ?? false,
       autoplayBlocked: latest?.autoplayBlocked ?? false,
+      position: latest?.position,
+      paused: latest?.paused,
+      ...(job.targetPosition !== undefined && latest?.position !== undefined
+        ? { alignmentMs: Math.abs(latest.position - job.targetPosition) * 1000 }
+        : {}),
     };
   }
 }

@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type { Movie } from "../shared/types";
 import { normalizeSource } from "../shared/media";
+
 export function MusicDiscovery({
   command,
   canControl,
@@ -15,17 +16,30 @@ export function MusicDiscovery({
     [tracks, setTracks] = useState<Movie[]>([]),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(false),
+    [searched, setSearched] = useState(false),
     [nav, setNav] = useState(false),
     [key, setKey] = useState(sessionStorage.getItem("foyer-library-key") || "");
+  const request = useRef<AbortController | null>(null);
   useEffect(() => {
-    fetch("/api/providers")
+    const c = new AbortController();
+    fetch("/api/providers", { signal: c.signal })
       .then((r) => r.json())
-      .then((v) => setNav(v.navidrome))
+      .then((v) => setNav(!!v.navidrome))
       .catch(() => {});
+    return () => {
+      c.abort();
+      request.current?.abort();
+    };
   }, []);
   async function search() {
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
+    const timeout = setTimeout(() => controller.abort(), 15000);
     setLoading(true);
     setError("");
+    setSearched(true);
+    setTracks([]);
     try {
       if (key) sessionStorage.setItem("foyer-library-key", key);
       const response = await fetch(
@@ -33,62 +47,71 @@ export function MusicDiscovery({
         {
           headers:
             provider === "navidrome" ? { "X-Foyer-Library-Key": key } : {},
-          signal: AbortSignal.timeout(15000),
+          signal: controller.signal,
         },
       );
       const result = await response.json();
       if (!response.ok)
         throw Error(result.error || "Music search unavailable.");
-      setTracks(result);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Music search unavailable.");
-      setTracks([]);
+      if (!Array.isArray(result))
+        throw Error("Music search returned an unexpected response.");
+      if (request.current === controller) setTracks(result);
+    } catch (failure) {
+      if (request.current === controller)
+        setError(
+          controller.signal.aborted
+            ? "Search timed out. Try again."
+            : failure instanceof Error
+              ? failure.message
+              : "Music search unavailable.",
+        );
     } finally {
-      setLoading(false);
+      clearTimeout(timeout);
+      if (request.current === controller) setLoading(false);
     }
   }
+  const play = (track: Movie, enqueue = false) =>
+    command({
+      type: "library",
+      provider: track.provider,
+      sourceId: track.sourceId,
+      enqueue,
+      start: !enqueue,
+    });
   return (
     <section className="panel music-discovery">
       <div className="section-heading">
         <div>
-          <div className="eyebrow">A SOUNDTRACK FOR YOUR PEOPLE</div>
-          <h2>Find your next listen.</h2>
+          <div className="eyebrow">MUSIC SEARCH</div>
+          <h2>Find a song</h2>
         </div>
-        <span className="pill">YOUTUBE + MUSIC LIBRARIES</span>
       </div>
       <form
         className="search-row"
         onSubmit={(e) => {
           e.preventDefault();
-          if (provider === "youtube") {
-            window.open(
-              `https://music.youtube.com/search?q=${encodeURIComponent(query)}`,
-              "_blank",
-              "noopener,noreferrer",
-            );
-            return;
-          }
           void search();
         }}
       >
         <input
           aria-label="Search songs"
           maxLength={100}
-          placeholder={
-            provider === "youtube"
-              ? "Find a song or artist on YouTube Music…"
-              : "Search songs or artists; leave blank for trending…"
-          }
+          placeholder="Song, artist or album"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          required={provider === "youtube"}
         />
         <select
           aria-label="Music provider"
           value={provider}
           onChange={(e) => {
+            request.current?.abort();
+            request.current = null;
             setProvider(e.target.value);
             setTracks([]);
             setError("");
+            setLoading(false);
+            setSearched(false);
           }}
         >
           <option value="youtube">YouTube Music</option>
@@ -98,21 +121,89 @@ export function MusicDiscovery({
           </option>
         </select>
         <button className="primary" disabled={loading}>
-          {provider === "youtube"
-            ? "Search YouTube Music ↗"
-            : loading
-              ? "Searching…"
-              : "Find music"}
+          {loading ? "Searching…" : "Search music"}
         </button>
       </form>
-      {provider === "youtube" && (
+      {provider === "navidrome" && (
+        <label>
+          Private library access code
+          <input
+            type="password"
+            autoComplete="off"
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            maxLength={128}
+          />
+        </label>
+      )}
+      <p className="music-search-help">
+        Choose a result to play it here.{" "}
+        {canControl
+          ? "Everyone can add to the queue."
+          : "The host starts playback; you can add songs to the queue."}
+      </p>
+      {error && (
+        <p role="alert" className="error">
+          {error}
+        </p>
+      )}
+      <div className="track-list" aria-busy={loading}>
+        {tracks.map((track) => (
+          <article className="track" key={track.id}>
+            {track.artwork ? (
+              <img
+                alt=""
+                src={track.artwork}
+                loading="lazy"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="track-icon">♪</div>
+            )}
+            <div>
+              <strong>{track.title}</strong>
+              <small>
+                {track.artist || "Independent artist"} ·{" "}
+                {track.durationEstimated
+                  ? "Duration checked on playback"
+                  : `${Math.floor(track.duration / 60)}:${String(Math.floor(track.duration % 60)).padStart(2, "0")}`}
+              </small>
+            </div>
+            <div className="track-actions">
+              <button
+                aria-label={`Play ${track.title}`}
+                disabled={!canControl}
+                onClick={() => play(track)}
+              >
+                Play
+              </button>
+              <button
+                aria-label={`Queue ${track.title}`}
+                disabled={!connected}
+                onClick={() => play(track, true)}
+              >
+                ＋
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+      {!loading && !tracks.length && !error && (
+        <p className="empty">
+          {searched
+            ? "No songs found. Try a different title or artist."
+            : "Search YouTube Music or discover independent tracks on Audius."}
+        </p>
+      )}
+      <details className="song-link-fallback">
+        <summary>Add a song link</summary>
         <form
           className="youtube-music-links"
-          onSubmit={(event) => {
-            event.preventDefault();
+          onSubmit={(e) => {
+            e.preventDefault();
             const form = new FormData(
-              event.currentTarget,
-              (event.nativeEvent as SubmitEvent).submitter,
+              e.currentTarget,
+              (e.nativeEvent as SubmitEvent).submitter,
             );
             try {
               if (
@@ -141,11 +232,6 @@ export function MusicDiscovery({
             });
           }}
         >
-          <p className="muted">
-            Search opens YouTube Music. Copy an individual song's share link
-            here to listen together. The official video stays visible; some
-            songs disallow embedding or require access on YouTube.
-          </p>
           <input
             name="title"
             aria-label="YouTube Music song title"
@@ -155,7 +241,7 @@ export function MusicDiscovery({
           <input
             name="url"
             aria-label="YouTube Music song URL"
-            placeholder="https://music.youtube.com/watch?v=…"
+            placeholder="YouTube or YouTube Music share link"
             type="url"
             required
             maxLength={2000}
@@ -169,84 +255,11 @@ export function MusicDiscovery({
             </button>
           </div>
         </form>
-      )}
-      {provider === "navidrome" && (
-        <label>
-          Private library access code
-          <input
-            type="password"
-            autoComplete="off"
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            maxLength={128}
-          />
-        </label>
-      )}
-      <p className="muted">
-        Audius contains artist-published music, not every commercial song.
-        YouTube Music, SoundCloud links and direct audio can also be added to
-        the room. Navidrome connects your own collection.
+      </details>
+      <p className="provider-note">
+        YouTube results use the official video player. Some tracks restrict
+        embedding. Audius carries artist-published music.
       </p>
-      {error && (
-        <p role="alert" className="error">
-          {error} The local demo remains available.
-        </p>
-      )}
-      <div className="track-list">
-        {tracks.map((track) => (
-          <article className="track" key={track.id}>
-            {track.artwork ? (
-              <img
-                alt=""
-                src={track.artwork}
-                loading="lazy"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <div className="track-icon">♪</div>
-            )}
-            <div>
-              <strong>{track.title}</strong>
-              <small>
-                {track.artist} · {Math.floor(track.duration / 60)}:
-                {String(Math.floor(track.duration % 60)).padStart(2, "0")} ·{" "}
-                {track.genres.join(", ")}
-              </small>
-            </div>
-            <button
-              disabled={!connected}
-              onClick={() =>
-                command({
-                  type: "library",
-                  provider: track.provider,
-                  sourceId: track.sourceId,
-                  enqueue: true,
-                })
-              }
-            >
-              ＋ Queue
-            </button>
-            <button
-              disabled={!canControl}
-              onClick={() =>
-                command({
-                  type: "library",
-                  provider: track.provider,
-                  sourceId: track.sourceId,
-                  enqueue: false,
-                })
-              }
-            >
-              Listen
-            </button>
-          </article>
-        ))}
-      </div>
-      {provider !== "youtube" && !loading && !tracks.length && !error && (
-        <p className="empty">
-          Search the open catalog, or start with the local melody.
-        </p>
-      )}
     </section>
   );
 }

@@ -92,12 +92,12 @@ try {
     });
     await page.getByRole("button", { name: "Pause", exact: true }).click();
   }
-  await page.getByRole("button", { name: "Sync me now" }).click();
+  await page.getByRole("button", { name: "Sync room" }).click();
   await page.waitForFunction(
     () =>
       document
         .querySelector("#sync-feedback")
-        ?.textContent.includes("Synced to the room"),
+        ?.textContent.includes("devices aligned"),
     undefined,
     { timeout: 15000 },
   );

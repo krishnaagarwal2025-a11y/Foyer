@@ -140,14 +140,26 @@ test("device packets precede common video/audio start, manual sync checks peers,
         (p: any) => p.reason === "play" && p.mediaRevision === revision,
       ),
     ).toHaveLength(3);
-    await guest.getByRole("button", { name: "Sync me now" }).click();
-    await expect(guest.locator("#sync-feedback")).toContainText(
-      "Synced to the room",
+    await expect(
+      guest.getByRole("button", { name: "Host controls sync" }),
+    ).toBeDisabled();
+    await host.getByRole("button", { name: "Sync room" }).click();
+    await expect(host.locator("#sync-feedback")).toContainText(
+      "devices aligned",
     );
-    for (const page of [host, guest])
+    for (const page of [host, guest]) {
+      const manual = (await state(page)).probes.filter(
+        (p: any) => p.reason === "manual",
+      );
+      expect(manual.length).toBeGreaterThanOrEqual(3);
+      expect(manual.length % 3).toBe(0); // readiness may require another 3-packet round
       expect(
-        (await state(page)).probes.filter((p: any) => p.reason === "manual"),
-      ).toHaveLength(3);
+        (await state(page)).last.synchronization.participants.every(
+          (p: any) =>
+            p.samples === 3 && p.ready && p.paused && p.alignmentMs <= 80,
+        ),
+      ).toBe(true);
+    }
     expect(
       (await state(guest)).commands.filter((c: any) =>
         ["play", "pause", "seek"].includes(c.type),

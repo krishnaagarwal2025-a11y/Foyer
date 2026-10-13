@@ -18,6 +18,8 @@ const connect = async (url) => {
       clientSentAt: performance.timeOrigin + performance.now(),
       ready: true,
       autoplayBlocked: false,
+      paused: true,
+      position: packet.targetPosition ?? 0,
     });
   });
   await new Promise((yes, no) => {
@@ -31,7 +33,7 @@ const connect = async (url) => {
 };
 const emit = (s, event, payload) =>
   new Promise((yes, no) =>
-    s.timeout(10000).emit(event, payload, (err, r) => (err ? no(err) : yes(r))),
+    s.timeout(18000).emit(event, payload, (err, r) => (err ? no(err) : yes(r))),
   );
 const command = (s, r, c, opId = crypto.randomUUID()) =>
   emit(s, "command", { opId, mediaRevision: r.mediaRevision, command: c });
@@ -72,15 +74,32 @@ try {
   );
   assert(first.ok && repeated.ok);
   assert.deepEqual(first, repeated);
-  const synced = await emit(b, "sync", {});
+  assert.equal(
+    (
+      await emit(b, "sync", {
+        opId: crypto.randomUUID(),
+        mediaRevision: late.room.mediaRevision,
+      })
+    ).ok,
+    false,
+  );
+  const synced = await emit(a, "sync", {
+    opId: crypto.randomUUID(),
+    mediaRevision: late.room.mediaRevision,
+  });
   assert(synced.ok, synced.error);
   assert.equal(synced.synchronization.participants.length, 3);
   assert(
     synced.synchronization.participants.every(
-      (p) => p.samples === 3 && p.rttMs !== null,
+      (p) =>
+        p.samples === 3 &&
+        p.rttMs !== null &&
+        p.ready &&
+        p.paused &&
+        p.alignmentMs <= 80,
     ),
   );
-  assert.equal(synced.room.position, 30);
+  assert(Math.abs(synced.room.position - 30) < 1);
   assert(synced.room.playing);
   assert.equal((await emit(b, "sync", { code: "FORGED" })).ok, false);
   const outsider = await connect(urls[1] || urls[0]);
@@ -113,7 +132,7 @@ try {
       "unauthorized control rejected",
       "duplicate operation deduplicated",
       "stable identity reconnect",
-      "fresh guest sync snapshot and invalid/unauthenticated sync rejection",
+      "host-only paused alignment barrier and invalid/unauthenticated/guest sync rejection",
       "three measured check exchanges across every room participant",
     ],
     passed: true,

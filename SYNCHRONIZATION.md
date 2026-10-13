@@ -1,38 +1,59 @@
-# Foyer device-check synchronization protocol
+# Foyer synchronization protocol
 
-Foyer measures both devices through the server. Three check exchanges run concurrently for each currently connected participant before a Play request, a queued winner, automatic advancement, and manual sync. This works for direct audio/video and supported provider players. The companion bridges the same packets to its service tab.
+The server owns media revision, play/pause state, position at a server-time anchor and increasing state version. While playing, expected position is `position + max(0, estimatedServerNow - anchor) / 1000`, clamped to duration. Clients ignore stale versions and apply only the loaded, seekable source.
+
+## Host room synchronization
+
+**Sync room** / **S** is always host-only. It pauses a playing room and starts a paused room only after the complete handshake. Guests retain automatic catch-up and a separate local autoplay permission action; they cannot invoke room sync through the UI, a raw socket request or collaborative control.
 
 ```mermaid
 sequenceDiagram
     participant H as Host
-    participant S as Room server
+    participant S as Authoritative server
     participant A as Device A
     participant B as Device B
-    H->>S: Play with operation ID and media revision
-    S->>S: Validate role, deduplicate, capture timeline
-    loop Three exchanges per device
-      S->>A: Check packet (ID, revision, server send time)
-      S->>B: Check packet (ID, revision, server send time)
-      A->>S: Receive/send timestamps and source readiness
-      B->>S: Receive/send timestamps and source readiness
-      S->>A: Four timestamps and measured RTT
-      S->>B: Four timestamps and measured RTT
+    H->>S: Sync (operation ID, media revision)
+    S->>S: Validate host, deduplicate, freeze position/membership
+    S->>A: Paused room + barrier ID
+    S->>B: Paused room + barrier ID
+    loop Bounded complete rounds of 3 concurrent packets per device
+        S->>A: Check with held position + server timestamp
+        S->>B: Check with held position + server timestamp
+        A->>A: Pause, rate=1, seek, wait for readiness
+        B->>B: Pause, rate=1, seek, wait for readiness
+        A->>S: Receive/send timestamps, paused position, readiness
+        B->>S: Receive/send timestamps, paused position, readiness
+        S->>A: Four timestamps + measured RTT
+        S->>B: Four timestamps + measured RTT
     end
-    S->>S: Revalidate captured timeline and commit future anchor
-    S->>A: Complete room state with common start time
-    S->>B: Complete room state with common start time
-    A->>A: Seek, hold paused, start at shared deadline
-    B->>B: Seek, hold paused, start at shared deadline
+    alt All connected members aligned and still the same room/audience
+        S->>S: Commit common future anchor
+        S->>A: Resume at shared deadline
+        S->>B: Resume at shared deadline
+        A->>A: Start, one-time native catch-up, bounded drift correction
+        B->>B: Start, one-time native catch-up, bounded drift correction
+    else Missing, blocked, changed or unavailable device
+        S->>A: Keep paused + error/failed barrier
+        S->>B: Keep paused + error/failed barrier
+    end
 ```
 
-For each exchange, `s0` is server send, `c1` client receive, `c2` client send and `s3` server receive. The server measures elapsed RTT with a monotonic clock and subtracts the client's processing interval `c2 - c1`. The client estimates server-minus-client offset as `((s0 - c1) + (s3 - c2)) / 2`. The lowest-RTT sample limits jitter. Offset and one-way delay remain estimates: asymmetric routes cannot be recovered exactly from round trips. No raw unsynchronized wall-clock difference is treated as latency.
+Each connected member must report three valid samples, the correct source revision, paused state, source readiness, no known autoplay block, and an absolute paused position difference of at most **80ms**. Clients seek differences above 10ms during the packet handler and wait for buffering/seeking before acknowledging. The server checks membership and host again before finishing; new joins/disconnections require a retry rather than silently dropping a device. Chat, votes and presence can change state versions without changing the held timeline. Controls that would move the timeline are rejected while waiting; explicit Pause cancels the barrier.
 
-The common-start lead is `clamp(1.5 × maximum measured RTT + 80 ms, 120 ms, 1500 ms)`. After checking, the server commits `anchor = serverNow + lead`. The position stays fixed before that anchor. Clients hold playback and use an aligned timer to start; normal drift correction continues afterwards. A pause cancels the pending start. A seek or duration confirmation during countdown preserves its deadline. Media changes invalidate the old check. Concurrent timeline changes during preparation are rejected; successful operation IDs are deduplicated before a repeat probe.
+Readiness waits default to 10s (`ROOM_SYNC_TIMEOUT_MS`, bounded to 0.2–12s). A barrier packet can wait 1.5s for its acknowledgement and its collector waits up to 2s; retries consist of complete three-packet rounds. Abandoned barriers expire paused after 15s. Long waits run outside the socket command queue so cancellation and disconnect remain responsive. Source changes, cancelled IDs, changed hosts/audiences and stale reports cannot commit an obsolete resume. Successful operation IDs are deduplicated. SQLite restart restoration discards active barriers and restores paused playback.
 
-Each packet has a 300-ms acknowledgement timeout; the collector waits up to one second for reports. Missing responses and sources still loading are reported honestly. Ready devices receive a scheduled start and waiting devices catch up when loaded; one missing or buffering device does not hold everyone indefinitely. Autoplay permission is still enforced by each browser. A known restriction is reported and the user can click to sync and play. Source readiness does not promise that browser autoplay will be allowed.
+## Clock estimation and scheduled start
 
-Manual sync performs the room-wide delay check, fetches the latest authenticated snapshot afterwards, and force-corrects only the requesting player. It resets playback rate, retries playback within the initial user gesture and confirms success only after a server response and a matching player state/timeline. It does not reschedule the room or grant guest control.
+For server send `s0`, client receive `c1`, client send `c2` and server receive `s3`, offset (server minus client) is `((s0 - c1) + (s3 - c2)) / 2`. RTT uses a server monotonic elapsed clock, subtracting client processing `c2 - c1`; seeking time is not mistaken for network delay. Lowest-RTT samples reduce jitter. The shared lead is `clamp(1.5 × max RTT + 80ms, 120ms, 1500ms)`. The server commits `anchor = serverNow + lead`; clients hold position and schedule starts against their estimated server clocks.
 
-In cloud mode, Redis Pub/Sub carries check requests and server-generated reports to all function instances. Each worker probes only its locally connected, current lease-owned members. The final playback mutation still uses the existing fenced room transaction. A single latest check is retained in the public room snapshot; pending checks and seen IDs are bounded. The People view displays measured RTT and source readiness; diagnostics show the estimated clock offset and drift.
+Normal Play, queued winners, automatic advancement and selected music-search results also use the three-packet clock check and future anchor. These starts allow a loading device to catch up; the host Sync action is the strict all-device pause barrier.
 
-Evidence: `tests/sync-protocol.test.ts`, `tests/browser/protocol.spec.ts`, `tests/browser/sync.spec.ts`, `tests/browser/youtube.spec.ts`, `evidence/protocol-cross-instance.json`, and the `protocol-*-benchmark` / `protocol-*-browser` reports. Socket-only tests use synthetic readiness and do not establish media playback. Localhost performance is separate from public Internet performance, and the deliberate common-start lead is included in player-application timing.
+Cloud mutations reload shared Redis state under a fenced per-room lock and commit before publishing. Pub/Sub distributes checks and reports across workers; only current lease-owned sockets are probed. Tokens never appear in public snapshots. Workers are assumed to have closely aligned system epochs; client estimates and provider time values are not independently trusted frame/speaker measurements.
+
+## Correction and limitations
+
+Native playback receives one force correction after a successful manual-barrier restart to compensate decode/start delay. Ordinary 100ms checks seek large (>500ms) errors, apply bounded ±5% rates for modest error, and reset rates near stability. Provider SDKs without reliable continuous rates use bounded seeks and wait for their asynchronous transitions. Corrections do not emit room commands. Fatal source errors stay latched until retry/source replacement, even if a paused SDK emits another ready event.
+
+Browser autoplay still needs local permission. **Enable playback on this device** primes playback muted within a user gesture, then follows the authoritative pause/start state; it does not grant guest room control. Buffering, hidden-tab throttling, network asymmetry, timer jitter, variable frame rate and hardware output delay can prevent exact synchronization. A reported 0ms paused API-position difference does **not** prove zero clock offset, zero physical playback error or simultaneous presented frames/audio. No implementation can guarantee literal 0ms across arbitrary browsers and networks.
+
+`npm run benchmark:sync` measures ten isolated browser contexts with actual local video/audio, reports pause/check/commit duration separately from resumed drift, and saves every trial. `npm run benchmark` measures transport-only delivery; `npm run benchmark:browser` separates normal event delivery, player-state application and drift. See PERFORMANCE.md for observed numbers and repeat conditions. Public Internet and localhost results are not labeled as physical-LAN or physical-phone verification.

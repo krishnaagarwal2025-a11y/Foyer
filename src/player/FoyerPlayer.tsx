@@ -104,12 +104,15 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
       container = useRef<HTMLDivElement | null>(null),
       iframe = useRef<HTMLIFrameElement | null>(null),
       adapter = useRef<PlaybackHandle | null>(null),
+      failed = useRef(false),
       callbacks = useRef(props);
     callbacks.current = props;
     const proxy = useMemo(
       () =>
         new Proxy({} as PlaybackHandle, {
           get: (_target, key) => {
+            if (failed.current && key === "readyState") return 0;
+            if (failed.current && key === "seekable") return { length: 0 };
             const a = adapter.current;
             if (!a) {
               if (key === "play")
@@ -134,16 +137,29 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
     useImperativeHandle(ref, () => proxy, [proxy]);
     useEffect(() => {
       let disposed = false,
+        unavailable = false,
         readinessReported = false,
         cleanup = () => {};
       adapter.current = null;
+      failed.current = false;
       const m = props.media,
         p = m.provider || "direct";
-      const error = (message: string) => {
-        if (!disposed) callbacks.current.onError(message);
+      const error = (message: string, fatal = true) => {
+        if (!disposed) {
+          if (fatal) {
+            unavailable = true;
+            failed.current = true;
+          }
+          callbacks.current.onError(message);
+        }
       };
       const ready = () => {
-        if (!disposed && !readinessReported) {
+        if (
+          !disposed &&
+          !unavailable &&
+          !failed.current &&
+          !readinessReported
+        ) {
           readinessReported = true;
           callbacks.current.onReady();
         }
@@ -264,10 +280,10 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
             return paused;
           },
           get readyState() {
-            return loaded ? 2 : 0;
+            return loaded && !unavailable ? 2 : 0;
           },
           get seekable() {
-            return { length: loaded ? 1 : 0 };
+            return { length: loaded && !unavailable ? 1 : 0 };
           },
           get seeking() {
             return seeking;
@@ -283,7 +299,7 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
             // The cached YouTube SDK constructs the iframe synchronously, but
             // mute/unMute are installed asynchronously at onReady. Retain the
             // user's selection while loading and apply it once ready.
-            if (loaded && !disposed) volume(v);
+            if (loaded && !disposed && !unavailable) volume(v);
           },
           playbackRate: 1,
           supportsRate: false,
@@ -297,7 +313,7 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
           },
         };
         const timer = setInterval(() => {
-          if (loaded && !disposed) query();
+          if (loaded && !disposed && !unavailable) query();
         }, 100);
         const timeout = setTimeout(() => {
           if (!loaded)
@@ -306,7 +322,7 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
             );
         }, 20000);
         const onReady = () => {
-          if (disposed) return;
+          if (disposed || unavailable) return;
           loaded = true;
           clearTimeout(timeout);
           volume(isMuted);
@@ -371,7 +387,7 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
                   onReady();
                 },
                 onStateChange: (e: { data: number }) => {
-                  if (disposed) return;
+                  if (disposed || unavailable) return;
                   buffering = e.data === 3;
                   if (e.data === 1) {
                     paused = false;
@@ -412,7 +428,7 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
                   const message =
                     "Autoplay was blocked. Click to sync and play.";
                   settlePlay(Error(message));
-                  error(message);
+                  error(message, false);
                 },
               },
             });
@@ -652,21 +668,31 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
       );
     const events = {
       onLoadedMetadata: () => {
-        if (!Number.isFinite(native.current?.duration))
+        if (failed.current) return;
+        if (!Number.isFinite(native.current?.duration)) {
+          failed.current = true;
           callbacks.current.onError(
             "Live streams are not synchronized yet. Use an on-demand source.",
           );
-        else callbacks.current.onReady();
+        } else callbacks.current.onReady();
       },
-      onCanPlay: () => callbacks.current.onReady(),
-      onPlaying: () => callbacks.current.onPlaying(),
+      onCanPlay: () => {
+        if (!failed.current) callbacks.current.onReady();
+      },
+      onPlaying: () => {
+        if (!failed.current) callbacks.current.onPlaying();
+      },
       onSeeked: () => callbacks.current.onSeeked(),
       onEnded: () => callbacks.current.onEnded(),
-      onWaiting: () => callbacks.current.onWaiting(),
-      onError: () =>
+      onWaiting: () => {
+        if (!failed.current) callbacks.current.onWaiting();
+      },
+      onError: () => {
+        failed.current = true;
         callbacks.current.onError(
           "This source cannot be played. Check its codec, availability and browser permissions. The host can select the local demo.",
-        ),
+        );
+      },
     };
     if (m.kind === "audio")
       return (

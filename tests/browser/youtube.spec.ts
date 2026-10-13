@@ -1,4 +1,8 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
+import { createApplication } from "../../server/app";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 // Deterministic asynchronous IFrame API fixture. This checks Foyer's integration
 // and feedback-loop handling, not YouTube's network/DRM/embed availability.
@@ -256,15 +260,21 @@ test("YouTube buffering settles, native host actions synchronize, retry rebuilds
     });
     await host.getByRole("button", { name: "Play", exact: true }).click();
     await expect(
-      host.getByRole("button", { name: "Click to sync and play" }),
+      host.getByRole("button", { name: "Enable playback on this device" }),
     ).toBeVisible();
     await host.evaluate(() => {
       (window as any).youtubeFixture.blocked = false;
     });
-    await host.getByRole("button", { name: "Sync me now" }).click();
+    await host
+      .getByRole("button", { name: "Enable playback on this device" })
+      .click();
+    await expect(
+      host.getByRole("button", { name: "Enable playback on this device" }),
+    ).toBeHidden();
+    await host.getByRole("button", { name: "Sync room" }).click();
     await expect.poll(async () => (await fixtureState(host)).state).toBe(1);
     await expect(host.locator("#sync-feedback")).toContainText(
-      "Synced to the room",
+      "devices aligned",
     );
     // A provider error leaves retry visible; retry must destroy/recreate the iframe.
     await host.evaluate(() =>
@@ -272,10 +282,10 @@ test("YouTube buffering settles, native host actions synchronize, retry rebuilds
         .at(-1)
         .options.events.onError({ data: 100 }),
     );
-    await host.getByRole("button", { name: "Sync me now" }).click();
-    await expect(host.locator("#sync-feedback")).toContainText(
-      "source is unavailable",
-    );
+    await host.getByRole("button", { name: "Sync room" }).click();
+    await expect(host.locator("#sync-feedback")).toContainText("Not ready", {
+      timeout: 15000,
+    });
     await host.getByRole("button", { name: "Retry source" }).click();
     await expect.poll(async () => (await fixtureState(host)).count).toBe(2);
     expect(
@@ -284,23 +294,7 @@ test("YouTube buffering settles, native host actions synchronize, retry rebuilds
       ),
     ).toBe(true);
     await host.getByRole("button", { name: "♪ Listen", exact: true }).click();
-    await expect(host.getByLabel("YouTube Music song URL")).toBeVisible();
-    await a.route("https://music.youtube.com/search**", (route) =>
-      route.fulfill({
-        body: "YouTube Music search fixture",
-        contentType: "text/html",
-      }),
-    );
-    await host.getByLabel("Search songs").fill("finding her");
-    const popupPromise = host.waitForEvent("popup");
-    await host
-      .getByRole("button", { name: "Search YouTube Music ↗", exact: true })
-      .click();
-    const searchPage = await popupPromise;
-    await expect(searchPage).toHaveURL(
-      "https://music.youtube.com/search?q=finding%20her",
-    );
-    await searchPage.close();
+    await host.locator(".song-link-fallback > summary").click();
     await host
       .getByLabel("YouTube Music song URL")
       .fill("https://media.example/song.mp3");
@@ -363,6 +357,7 @@ test("changing songs with a cached YouTube SDK never blanks host or guest", asyn
       });
     await host.getByRole("button", { name: "♪ Listen", exact: true }).click();
     await host.getByRole("button", { name: "Discover", exact: true }).click();
+    await host.locator(".song-link-fallback > summary").click();
     for (let i = 0; i < 4; i++) {
       await host.getByLabel("YouTube Music song title").fill(`Song ${i + 1}`);
       await host
@@ -399,14 +394,106 @@ test("changing songs with a cached YouTube SDK never blanks host or guest", asyn
     ).toBe(3);
     await host.getByRole("button", { name: "Play", exact: true }).click();
     await expect.poll(async () => (await fixtureState(guest)).state).toBe(1);
-    await guest.getByRole("button", { name: "Sync me now" }).click();
-    await expect(guest.locator("#sync-feedback")).toContainText(
-      "Synced to the room",
+    await host.getByRole("button", { name: "Sync room" }).click();
+    await expect(host.locator("#sync-feedback")).toContainText(
+      "devices aligned",
     );
     expect(errors).toEqual([]);
   } finally {
     if (errors.length) console.error("Song-switch browser errors:", errors);
     await a.close();
     await b.close();
+  }
+});
+
+test("in-app music search plays a selected result across the room without a new tab or copied link", async ({
+  browser,
+}) => {
+  const directory = mkdtempSync(path.join(tmpdir(), "foyer-test-search-"));
+  const app = await createApplication({
+    dataDirectory: directory,
+    musicSearch: async () => [
+      {
+        id: "youtube:M7lc1UVf-VE",
+        sourceId: "M7lc1UVf-VE",
+        provider: "youtube",
+        kind: "video",
+        title: "In-app search fixture",
+        artist: "Fixture artist",
+        duration: 255,
+        genres: ["Music"],
+        tags: [],
+        description: "Deterministic metadata fixture",
+        color: "#777",
+        url: "https://www.youtube.com/watch?v=M7lc1UVf-VE",
+      },
+    ],
+  });
+  await new Promise<void>((resolve) =>
+    app.http.listen(0, "127.0.0.1", resolve),
+  );
+  const base = `http://127.0.0.1:${(app.http.address() as any).port}`;
+  const a = await browser.newContext(),
+    b = await browser.newContext();
+  await installYouTube(a);
+  await installYouTube(b);
+  const host = await a.newPage(),
+    guest = await b.newPage();
+  const errors: string[] = [];
+  for (const page of [host, guest])
+    page.on("pageerror", (error) => errors.push(error.message));
+  try {
+    await host.goto(base);
+    await host.getByLabel("Display name").fill("Search host");
+    await host.getByRole("button", { name: "＋ Create a room" }).click();
+    await expect(host.locator("video")).toBeVisible();
+    const code = new URL(host.url()).searchParams.get("room")!;
+    await guest.goto(base + "/?room=" + code);
+    await guest.getByLabel("Display name").fill("Search guest");
+    await guest.getByRole("button", { name: "Join room →" }).click();
+    await host.getByRole("button", { name: "♪ Listen", exact: true }).click();
+    for (const page of [host, guest]) {
+      await page.getByRole("button", { name: "Discover", exact: true }).click();
+      await page.getByLabel("Search songs").fill("fixture");
+      await page
+        .getByRole("button", { name: "Search music", exact: true })
+        .click();
+      await expect(
+        page.getByRole("button", { name: "Play In-app search fixture" }),
+      ).toBeVisible();
+    }
+    await expect(
+      guest.getByRole("button", { name: "Play In-app search fixture" }),
+    ).toBeDisabled();
+    await guest
+      .getByRole("button", { name: "Queue In-app search fixture" })
+      .click();
+    await expect.poll(() => app.engine.rooms.get(code)!.queue.length).toBe(1);
+    await host
+      .getByRole("button", { name: "Play In-app search fixture" })
+      .click();
+    for (const page of [host, guest]) {
+      await expect(
+        page.getByRole("heading", { name: "In-app search fixture", level: 1 }),
+      ).toBeVisible();
+      await expect.poll(async () => (await fixtureState(page)).state).toBe(1);
+    }
+    expect(a.pages()).toHaveLength(1);
+    expect(b.pages()).toHaveLength(1);
+    expect(errors).toEqual([]);
+    await host.screenshot({
+      path: "evidence/music-search-integrated.png",
+      fullPage: true,
+    });
+  } finally {
+    await a.close();
+    await b.close();
+    await app.close();
+    if (
+      path
+        .resolve(directory)
+        .startsWith(path.resolve(tmpdir(), "foyer-test-search-"))
+    )
+      rmSync(directory, { recursive: true, force: true });
   }
 });

@@ -40,6 +40,8 @@ const media = z.object({
 const command = z.discriminatedUnion("type", [
   z.object({ type: z.literal("play") }),
   z.object({ type: z.literal("pause") }),
+  z.object({ type: z.literal("resync") }),
+  z.object({ type: z.literal("resyncFinish") }),
   z.object({
     type: z.literal("seek"),
     position: z.number().finite().min(0).max(43200),
@@ -54,9 +56,10 @@ const command = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("library"),
-    provider: z.enum(["audius", "navidrome"]),
+    provider: z.enum(["youtube", "audius", "navidrome"]),
     sourceId: id,
     enqueue: z.boolean().default(false),
+    start: z.boolean().default(false),
   }),
   z.object({
     type: z.literal("duration"),
@@ -115,6 +118,7 @@ type Credentials = { id: string; token: string };
 type Session = { code: string; id: string };
 export type Saved = { room: Room; tokens: Record<string, string> };
 export type PlaybackPreparation = {
+  roomSyncId?: string;
   baseline?: Pick<
     Room,
     "code" | "mediaRevision" | "anchor" | "position" | "playing"
@@ -142,6 +146,7 @@ export class Engine {
     r.position = expectedPosition(r, this.now());
     r.anchor = this.now();
     r.playing = false;
+    delete r.syncBarrier;
     r.version++;
     r.participants.forEach((p) => {
       p.connected = false;
@@ -291,6 +296,15 @@ export class Engine {
   sweep(code?: string) {
     for (const r of this.rooms.values()) {
       if (code && r.code !== code) continue;
+      if (
+        r.syncBarrier?.status === "waiting" &&
+        this.now() - r.syncBarrier.startedAt > 15000
+      ) {
+        r.syncBarrier.status = "failed";
+        r.syncBarrier.error =
+          "The device handshake expired. Playback remains paused; the host can retry.";
+        this.commit(r);
+      }
       const expired = r.participants.filter(
         (p) =>
           !p.connected && (this.deadlines.get(p.id) || Infinity) <= this.now(),
@@ -338,6 +352,23 @@ export class Engine {
       return { ok: false, error: "Only the host can control playback." };
     return current;
   }
+  prepareRoomSync(socketId: string, input: unknown): Result {
+    const current = this.sync(socketId);
+    if (!current.ok) return current;
+    const parsed = envelope.safeParse(input);
+    if (!parsed.success || parsed.data.command.type !== "resync")
+      return { ok: false, error: "Invalid room sync request." };
+    const session = this.sessions.get(socketId)!;
+    if (current.room!.hostId !== session.id)
+      return { ok: false, error: "Only the host can synchronize the room." };
+    const duplicate = this.operations
+      .get(session.code)
+      ?.get(`${session.id}:${parsed.data.opId}`);
+    if (duplicate) return duplicate;
+    if (parsed.data.mediaRevision !== current.room!.mediaRevision)
+      return { ok: false, error: "Media changed. Retry room sync." };
+    return current;
+  }
   apply(
     socketId: string,
     input: unknown,
@@ -374,6 +405,23 @@ export class Engine {
           ? ["source", "library"]
           : []),
       ];
+    if (["resync", "resyncFinish"].includes(c.type) && !host)
+      return { ok: false, error: "Only the host can synchronize the room." };
+    if (c.type === "resyncFinish" && !preparation?.roomSyncId)
+      return {
+        ok: false,
+        error: "Only the server can complete a device handshake.",
+      };
+    if (
+      r.syncBarrier?.status === "waiting" &&
+      c.type !== "pause" &&
+      (controls.includes(c.type) ||
+        ["resync", "transfer", "mode"].includes(c.type))
+    )
+      return {
+        ok: false,
+        error: "The room is synchronizing. Wait, or press Pause to cancel.",
+      };
     if (c.type === "duration" && !host)
       return { ok: false, error: "Only the host can confirm media duration." };
     if (
@@ -415,6 +463,7 @@ export class Engine {
       r.anchor = this.now();
       r.playing = false;
       delete r.synchronization;
+      delete r.syncBarrier;
     };
     const next = () => {
       const winner = r.queue
@@ -432,6 +481,96 @@ export class Engine {
       return false;
     };
     switch (c.type) {
+      case "resync":
+        if (mediaRevision !== r.mediaRevision)
+          return { ok: false, error: "Media changed. Retry room sync." };
+        r.position = expectedPosition(r, this.now());
+        if (r.position >= r.media.duration) r.position = 0;
+        r.playing = false;
+        r.anchor = this.now();
+        delete r.synchronization;
+        r.syncBarrier = {
+          id: opId,
+          hostId: s.id,
+          startedAt: this.now(),
+          position: r.position,
+          mediaRevision: r.mediaRevision,
+          participants: r.participants
+            .filter((p) => p.connected)
+            .map((p) => p.id)
+            .sort(),
+          status: "waiting",
+        };
+        break;
+      case "resyncFinish": {
+        const barrier = r.syncBarrier,
+          check = preparation?.check;
+        if (
+          !barrier ||
+          barrier.status !== "waiting" ||
+          barrier.id !== preparation?.roomSyncId ||
+          barrier.hostId !== s.id ||
+          r.playing ||
+          barrier.mediaRevision !== r.mediaRevision ||
+          barrier.position !== r.position ||
+          !check ||
+          check.code !== r.code ||
+          check.reason !== "manual" ||
+          check.checkedAt < barrier.startedAt ||
+          this.now() - check.checkedAt > 3000 ||
+          check.mediaRevision !== r.mediaRevision
+        )
+          return {
+            ok: false,
+            error: "The device handshake was cancelled or the room changed.",
+          };
+        const connected = r.participants
+          .filter((p) => p.connected)
+          .map((p) => p.id)
+          .sort();
+        const sameMembers =
+          connected.join(":") === barrier.participants.join(":") &&
+          check.participants
+            .map((p) => p.participantId)
+            .sort()
+            .join(":") === connected.join(":");
+        const waiting = check.participants.filter(
+          (p) =>
+            !p.ready ||
+            p.samples < 3 ||
+            p.autoplayBlocked ||
+            !p.paused ||
+            p.alignmentMs === undefined ||
+            p.alignmentMs > 80,
+        );
+        if (!sameMembers || waiting.length) {
+          const names = waiting
+            .map(
+              (p) =>
+                r.participants.find((m) => m.id === p.participantId)?.name ||
+                "a device",
+            )
+            .join(", ");
+          const error = sameMembers
+            ? `Playback remains paused. Not ready: ${names || "a device"}. Enable playback or wait for loading, then retry.`
+            : "The audience changed during sync. Playback remains paused; retry with the current devices.";
+          barrier.status = "failed";
+          barrier.error = error;
+          r.lastOperation = { id: opId, type: "resyncFinish" };
+          this.commit(r);
+          return {
+            ok: false,
+            error,
+            room: this.snapshot(r),
+            synchronization: check,
+          };
+        }
+        r.anchor = this.now() + startLeadMs(check.participants);
+        r.playing = true;
+        r.synchronization = { ...check, startAt: r.anchor };
+        delete r.syncBarrier;
+        break;
+      }
       case "mode":
         r.settings.mode = c.mode;
         if (c.mode === "listen")
@@ -485,7 +624,11 @@ export class Engine {
       }
       case "duration": {
         const position = expectedPosition(r, this.now());
-        r.media = { ...r.media, duration: c.duration };
+        r.media = {
+          ...r.media,
+          duration: c.duration,
+          durationEstimated: false,
+        };
         r.position = Math.min(position, c.duration);
         r.anchor = r.playing ? Math.max(this.now(), r.anchor) : this.now();
         break;
@@ -509,6 +652,7 @@ export class Engine {
         r.position = expectedPosition(r, this.now());
         r.anchor = this.now();
         r.playing = false;
+        delete r.syncBarrier;
         break;
       case "seek":
         r.position = Math.min(c.position, r.media.duration);

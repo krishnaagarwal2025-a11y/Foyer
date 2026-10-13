@@ -284,7 +284,7 @@ export class CloudCoordinator {
         const command = (input as any)?.command;
         if (
           command?.type === "library" &&
-          ["audius", "navidrome"].includes(command.provider) &&
+          ["youtube", "audius", "navidrome"].includes(command.provider) &&
           typeof command.sourceId === "string"
         ) {
           const movie = await this.store.movie(

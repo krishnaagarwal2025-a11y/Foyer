@@ -93,9 +93,12 @@ test("phone layouts fit at 320–430px and landscape while songs, sync and chat 
         .toBe(false);
     }
     await host.locator(".source-panel > summary").tap();
-    await guest.getByRole("button", { name: "Sync me now" }).tap();
-    await expect(guest.locator("#sync-feedback")).toContainText(
-      "Synced to the room",
+    await expect(
+      guest.getByRole("button", { name: "Host controls sync" }),
+    ).toBeDisabled();
+    await host.getByRole("button", { name: "Sync room" }).tap();
+    await expect(host.locator("#sync-feedback")).toContainText(
+      "devices aligned",
     );
     await host.getByRole("button", { name: "Pause", exact: true }).tap();
     await host.getByRole("button", { name: "Room", exact: true }).tap();

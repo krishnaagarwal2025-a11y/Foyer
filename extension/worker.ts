@@ -12,6 +12,7 @@ type Connection = {
   samples: { rtt: number; offset: number }[];
   resumeTimer?: ReturnType<typeof setTimeout>;
   lastProbe?: string;
+  room?: Room;
 };
 const connections = new Map<number, Connection>();
 const send = (tab: number, message: unknown) => {
@@ -80,13 +81,17 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       respond({ ok: false, error: "Reconnect before syncing." });
       return;
     }
-    c.socket
-      .timeout(5000)
-      .emit("sync", {}, (error: Error | null, result: Result) =>
+    c.socket.timeout(18000).emit(
+      "sync",
+      {
+        opId: crypto.randomUUID(),
+        mediaRevision: c.room?.mediaRevision ?? 0,
+      },
+      (error: Error | null, result: Result) =>
         respond(
           error ? { ok: false, error: "Device check timed out." } : result,
         ),
-      );
+    );
     return true;
   }
   if (message.type !== "foyer:connect") return;
@@ -223,6 +228,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
                 return;
               }
               c.code = result.room!.code;
+              c.room = result.room;
               c.identity = result.identity;
               void chrome.storage.local.set({
                 [`identity:${server}:${tab}:${c.code}`]: result.identity,
@@ -248,9 +254,10 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         });
         send(tab, { type: "foyer:status", status: "Room closed" });
       });
-      socket.on("state", (room: Room) =>
-        send(tab, { type: "foyer:state", room }),
-      );
+      socket.on("state", (room: Room) => {
+        c.room = room;
+        send(tab, { type: "foyer:state", room });
+      });
       socket.on("reaction", (data) =>
         send(tab, { type: "foyer:reaction", data }),
       );

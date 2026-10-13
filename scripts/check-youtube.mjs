@@ -61,12 +61,12 @@ try {
       undefined,
       { timeout: 10000 },
     );
-    await page.getByRole("button", { name: "Sync me now" }).click();
+    await page.getByRole("button", { name: "Sync room" }).click();
     await page.waitForFunction(
       () =>
         document
           .querySelector("#sync-feedback")
-          ?.textContent.includes("Synced to the room"),
+          ?.textContent.includes("devices aligned"),
       undefined,
       { timeout: 10000 },
     );
@@ -100,7 +100,7 @@ try {
       .catch(() => ({ unavailable: true }));
   report.feedback = await page.locator(".video-message").allTextContents();
   report.autoplayAction = await page
-    .getByRole("button", { name: "Click to sync and play" })
+    .getByRole("button", { name: "Enable playback on this device" })
     .isVisible();
   await page.locator(".provider-frame").scrollIntoViewIfNeeded();
   await page.waitForTimeout(300);

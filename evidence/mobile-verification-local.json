@@ -1,6 +1,6 @@
 {
   "url": "http://localhost:3001",
-  "checkedAt": "2026-10-12T18:23:21.704Z",
+  "checkedAt": "2026-10-13T06:06:05.915Z",
   "passed": true,
   "layouts": [
     {
@@ -107,5 +107,6 @@
     }
   ],
   "pageErrors": [],
-  "conditions": "Two isolated Chromium contexts with mobile/touch emulation, actual local audio playback. Not a physical iPhone/Android or Safari test."
+  "conditions": "Two isolated Chromium contexts with mobile/touch emulation, autoplay allowed, actual bundled demo audio playback. Not a physical iPhone/Android or Safari test.",
+  "mediaLoadingTimeoutMs": 20000
 }

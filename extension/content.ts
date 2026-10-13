@@ -79,7 +79,12 @@ if (!document.getElementById("foyer-companion")) {
       `${room.media.title} · ${room.hostId === self ? "You are host" : "Host controls"} · ${room.participants.length} people`;
     for (const id of ["play", "pause", "seekbutton", "bind"])
       button(id).disabled = !controls();
-    button("sync").disabled = !matches() || !bound;
+    button("sync").disabled =
+      !matches() ||
+      !bound ||
+      room.hostId !== self ||
+      status !== "Connected" ||
+      room.syncBarrier?.status === "waiting";
     button("transfer").disabled =
       room.hostId !== self || status !== "Connected";
     const select = $<HTMLSelectElement>("participants"),
@@ -183,6 +188,7 @@ if (!document.getElementById("foyer-companion")) {
     if (!room.playing && !bound.paused) bound.pause();
   }
   const nativeAction = (type: string) => {
+    if (room?.syncBarrier?.status === "waiting") return;
     if (room?.playing && room.anchor > now() + offset) return;
     if (adActive() || !matches() || !controls() || !bound) return;
     // Browser events caused by our own correction can arrive after the seek/play
@@ -270,8 +276,11 @@ if (!document.getElementById("foyer-companion")) {
       notice("Reconnect before syncing.");
       return;
     }
-    apply(true);
-    notice("Checking device delays…");
+    if (room?.hostId !== self) {
+      notice("Only the host can synchronize the room.");
+      return;
+    }
+    notice("Pausing the room and checking every device…");
     void chrome.runtime
       .sendMessage({ type: "foyer:sync" })
       .then((result: Result) => {
@@ -356,25 +365,58 @@ if (!document.getElementById("foyer-companion")) {
       case "foyer:sync-check": {
         const clientReceivedAt = now(),
           packet = message.packet;
-        respond({
-          id: packet.id,
-          sequence: packet.sequence,
-          mediaRevision: room?.mediaRevision ?? -1,
-          clientReceivedAt,
-          clientSentAt: now(),
-          ready:
-            !!room &&
-            room.code === packet.code &&
-            room.mediaRevision === packet.mediaRevision &&
+        void (async () => {
+          let aligned = !packet.barrierId;
+          if (
+            packet.barrierId &&
+            room?.syncBarrier?.id === packet.barrierId &&
             matches() &&
-            !adActive() &&
-            !!bound &&
-            bound.readyState >= 2 &&
-            bound.seekable.length > 0 &&
-            !bound.seeking,
-          autoplayBlocked: false,
-        });
-        break;
+            bound &&
+            !adActive()
+          ) {
+            try {
+              bound.pause();
+              bound.playbackRate = 1;
+              if (
+                bound.readyState >= 2 &&
+                !bound.seeking &&
+                Math.abs(bound.currentTime - packet.targetPosition) > 0.01
+              )
+                bound.currentTime = packet.targetPosition;
+              const until = performance.now() + 1000;
+              while (bound.seeking && performance.now() < until)
+                await new Promise((resolve) => setTimeout(resolve, 20));
+              aligned =
+                bound.paused &&
+                Math.abs(bound.currentTime - packet.targetPosition) * 1000 <=
+                  packet.toleranceMs;
+            } catch {
+              aligned = false;
+            }
+          }
+          respond({
+            id: packet.id,
+            sequence: packet.sequence,
+            mediaRevision: room?.mediaRevision ?? -1,
+            clientReceivedAt,
+            clientSentAt: now(),
+            ready:
+              aligned &&
+              !!room &&
+              room.code === packet.code &&
+              room.mediaRevision === packet.mediaRevision &&
+              matches() &&
+              !adActive() &&
+              !!bound &&
+              bound.readyState >= 2 &&
+              bound.seekable.length > 0 &&
+              !bound.seeking,
+            autoplayBlocked: false,
+            paused: bound?.paused,
+            position: bound?.currentTime,
+          });
+        })();
+        return true;
       }
       case "foyer:toggle":
         $("panel").classList.toggle("hidden");

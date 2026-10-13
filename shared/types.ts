@@ -19,6 +19,7 @@ export type Movie = {
   genres: string[];
   tags: string[];
   duration: number;
+  durationEstimated?: boolean;
   url?: string;
   color: string;
 };
@@ -51,6 +52,9 @@ export type SyncMeasurement = {
   samples: number;
   ready: boolean;
   autoplayBlocked: boolean;
+  position?: number;
+  paused?: boolean;
+  alignmentMs?: number;
 };
 export type Synchronization = {
   id: string;
@@ -68,6 +72,9 @@ export type SyncProbe = {
   reason: "play" | "manual";
   participants: string[];
   expiresAt: number;
+  barrierId?: string;
+  targetPosition?: number;
+  toleranceMs?: number;
 };
 export type SyncClockPacket = {
   id: string;
@@ -78,6 +85,16 @@ export type SyncClockPacket = {
   rttMs: number;
 };
 export type Room = {
+  syncBarrier?: {
+    id: string;
+    hostId: string;
+    startedAt: number;
+    position: number;
+    mediaRevision: number;
+    participants: string[];
+    status: "waiting" | "failed";
+    error?: string;
+  };
   synchronization?: Synchronization;
   lastOperation?: { id: string; type: string };
   code: string;

@@ -9,6 +9,7 @@ import { Readable } from "node:stream";
 import { z } from "zod";
 import type { Engine } from "./engine.js";
 import type { Movie } from "../shared/types.js";
+import { searchYouTube } from "./youtube-search.js";
 const safeId = z.string().regex(/^[A-Za-z0-9_-]{1,80}$/),
   signingKey = process.env.FOYER_STREAM_SECRET
     ? createHash("sha256").update(process.env.FOYER_STREAM_SECRET).digest()
@@ -57,6 +58,7 @@ export function mountMusic(
   app: Express,
   engine: Engine,
   remember?: (movies: Movie[]) => Promise<void>,
+  youtubeSearch = searchYouTube,
 ) {
   const cache = new Map<string, { expires: number; movies: Movie[] }>();
   app.get("/api/providers", (_req, res) =>
@@ -74,7 +76,7 @@ export function mountMusic(
   app.get("/api/music", async (req, res) => {
     const parsed = z
       .object({
-        provider: z.enum(["audius", "navidrome"]),
+        provider: z.enum(["youtube", "audius", "navidrome"]),
         q: z.string().trim().max(100).default(""),
       })
       .safeParse(req.query);
@@ -86,6 +88,10 @@ export function mountMusic(
       return;
     }
     const { provider, q } = parsed.data;
+    if (provider === "youtube" && !q) {
+      res.json([]);
+      return;
+    }
     if (provider === "navidrome" && (!enabled() || !authorized(req))) {
       res.status(enabled() ? 403 : 503).json({
         error: enabled()
@@ -102,7 +108,15 @@ export function mountMusic(
     }
     try {
       let movies: Movie[] = [];
-      if (provider === "audius") {
+      if (provider === "youtube") {
+        try {
+          movies = await youtubeSearch(q);
+        } catch {
+          throw Error(
+            "YouTube Music search is unavailable right now. Retry, choose Audius, or add a song link below.",
+          );
+        }
+      } else if (provider === "audius") {
         const url = q
           ? `${endpoint}/tracks/search?query=${encodeURIComponent(q)}&limit=24&app_name=Foyer`
           : `${endpoint}/tracks/trending?limit=24&app_name=Foyer`;

@@ -24,6 +24,7 @@ import { acceptSnapshot as accept, probeClockOffset } from "../shared/sync";
 import "./style.css";
 import "./provider.css";
 import "./room.css";
+import "./design.css";
 import type { PlaybackHandle } from "./player/FoyerPlayer";
 import { PlayerBoundary } from "./player/PlayerBoundary";
 const FoyerPlayer = lazy(() =>
@@ -62,6 +63,18 @@ const time = (n: number) =>
     .toString()
     .padStart(2, "0")}`;
 function App() {
+  const [theme, setTheme] = useState<"dark" | "light">(
+    document.documentElement.dataset.theme === "light" ? "light" : "dark",
+  );
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute("content", theme === "dark" ? "#111214" : "#f4f4f2");
+    try {
+      localStorage.setItem("foyer-theme", theme);
+    } catch {}
+  }, [theme]);
   const [room, setRoom] = useState<Room | null>(null),
     [catalog, setCatalog] = useState<Movie[]>([]),
     [name, setName] = useState(sessionStorage.getItem("name") || ""),
@@ -105,6 +118,8 @@ function App() {
     offsetRef = useRef(0),
     blockedRef = useRef(false),
     videoErrorRef = useRef(""),
+    priming = useRef(false),
+    resumedRoomCheck = useRef<string | undefined>(undefined),
     resume = useRef<{ code: string; name: string } | null>(null),
     loadedRevision = useRef(-1),
     manualSync = useRef<{
@@ -319,7 +334,7 @@ function App() {
     });
     s.on(
       "sync-check",
-      (
+      async (
         packet: SyncProbe & { sequence: number; serverSentAt: number },
         ack: (reply: unknown) => void,
       ) => {
@@ -335,6 +350,42 @@ function App() {
         window.dispatchEvent(
           new CustomEvent("watchparty:probe", { detail: packet }),
         );
+        let aligned = !packet.barrierId;
+        if (
+          packet.barrierId &&
+          r.syncBarrier?.id === packet.barrierId &&
+          packet.mediaRevision === r.mediaRevision &&
+          v &&
+          loadedRevision.current === r.mediaRevision &&
+          !priming.current
+        ) {
+          try {
+            v.pause();
+            v.playbackRate = 1;
+            if (
+              v.readyState >= 2 &&
+              !v.seeking &&
+              !v.buffering &&
+              Math.abs(v.currentTime - packet.targetPosition!) > 0.01
+            )
+              v.currentTime = packet.targetPosition!;
+            const until = performance.now() + 1000;
+            while (
+              (v.seeking || v.buffering) &&
+              performance.now() < until &&
+              video.current === v
+            )
+              await new Promise((resolve) => setTimeout(resolve, 20));
+            aligned =
+              video.current === v &&
+              latest.current?.syncBarrier?.id === packet.barrierId &&
+              v.paused &&
+              Math.abs(v.currentTime - packet.targetPosition!) * 1000 <=
+                packet.toleranceMs!;
+          } catch {
+            aligned = false;
+          }
+        }
         ack({
           id: packet.id,
           sequence: packet.sequence,
@@ -342,6 +393,9 @@ function App() {
           clientReceivedAt,
           clientSentAt: monotonic(),
           ready:
+            aligned &&
+            !priming.current &&
+            !blockedRef.current &&
             packet.mediaRevision === r.mediaRevision &&
             loadedRevision.current === r.mediaRevision &&
             !!v &&
@@ -351,6 +405,8 @@ function App() {
             !v.seeking &&
             !sourceFailed(videoErrorRef.current),
           autoplayBlocked: blockedRef.current,
+          position: v?.currentTime,
+          paused: v?.paused,
         });
       },
     );
@@ -470,9 +526,11 @@ function App() {
   const canControl =
       !!room &&
       (room.hostId === self || room.settings.collaborative) &&
+      room.syncBarrier?.status !== "waiting" &&
       status === "Connected",
     host = room?.hostId === self;
   const synchronize = useCallback(() => {
+    if (priming.current) return;
     const r = latest.current,
       v = video.current;
     const request = manualSync.current;
@@ -524,6 +582,14 @@ function App() {
           })
           .catch((failure: unknown) => {
             if (video.current !== v) return;
+            if (
+              failure instanceof Error &&
+              failure.name === "AbortError" &&
+              (manualSync.current ||
+                latest.current?.syncBarrier ||
+                !latest.current?.playing)
+            )
+              return;
             const message =
               failure instanceof Error
                 ? failure.message
@@ -555,7 +621,15 @@ function App() {
       v.pause();
       return;
     }
-    const force = !!manualSync.current && !manualSync.current.adjusted;
+    // Correct native decode/start delay once after the shared deadline, without
+    // repeatedly seeking or sending room commands from local correction.
+    const resumeCatchup =
+      r.playing &&
+      r.synchronization?.reason === "manual" &&
+      v.supportsRate !== false &&
+      resumedRoomCheck.current !== r.synchronization.id;
+    const force = r.syncBarrier?.status === "waiting" || resumeCatchup;
+    if (resumeCatchup) resumedRoomCheck.current = r.synchronization!.id;
     const fix = force
       ? { seek: Math.abs(delta) > 0.02, rate: 1 }
       : correction(delta, r.playing);
@@ -563,23 +637,12 @@ function App() {
       fix.rate = 1;
       if (!force) fix.seek = Math.abs(delta) > (r.playing ? 0.4 : 0.15);
     }
-    if (force) manualSync.current!.adjusted = true;
     if (fix.seek) {
       try {
         v.currentTime = Math.min(expected, v.duration || expected);
       } catch {}
     }
     v.playbackRate = fix.rate;
-    if (
-      manualSync.current?.confirmed &&
-      !v.seeking &&
-      v.paused === !r.playing &&
-      Math.abs(expected - v.currentTime) <= 0.5
-    ) {
-      manualSync.current = null;
-      setSyncing(false);
-      setSyncMessage("Synced to the room. Only your player was adjusted.");
-    }
     if (
       r.version >= (playbackOperation.current?.version ?? -1) &&
       !v.seeking &&
@@ -609,49 +672,93 @@ function App() {
       return;
     }
     if (r.media.kind === "external") return;
+    if (r.hostId !== selfRef.current) {
+      setSyncMessage("Only the host can synchronize the room.");
+      return;
+    }
     if (manualSync.current) return;
     const request = {
       id: crypto.randomUUID(),
-      expires: performance.now() + 12000,
+      expires: performance.now() + 20000,
       confirmed: false,
       adjusted: false,
     };
     manualSync.current = request;
-    blockedRef.current = false;
-    setBlocked(false);
     setSyncing(true);
-    setSyncMessage("Syncing your player… waiting for the room and source.");
-    // Invoke playback in the click/keyboard gesture, before awaiting the network.
-    synchronize();
-    s.timeout(5000).emit("sync", {}, (err: Error | null, result: Result) => {
-      if (manualSync.current?.id !== request.id) return;
-      if (latest.current?.code !== r.code) return;
-      if (err || !result?.ok || !result.room || result.room.code !== r.code) {
+    setSyncMessage(
+      "Pausing the room. Waiting for every device to align and complete its handshake…",
+    );
+    try {
+      video.current?.pause();
+    } catch {}
+    s.timeout(18000).emit(
+      "sync",
+      { opId: request.id, mediaRevision: r.mediaRevision },
+      (err: Error | null, result: Result) => {
+        if (manualSync.current?.id !== request.id) return;
+        if (latest.current?.code !== r.code) return;
+        if (result?.room?.code === r.code) {
+          const fresh = accept(latest.current, result.room);
+          latest.current = fresh;
+          setRoom((previous) => accept(previous, fresh));
+          if (result.synchronization) setLastCheck(result.synchronization);
+        }
+        if (err || !result?.ok || !result.room || result.room.code !== r.code) {
+          manualSync.current = null;
+          setSyncing(false);
+          setSyncMessage(
+            result?.error ||
+              "The room did not respond. Check your connection and retry.",
+          );
+          return;
+        }
+        const current = accept(latest.current, result.room);
+        if (result.synchronization) setLastCheck(result.synchronization);
+        latest.current = current;
+        setRoom((previous) => accept(previous, current));
         manualSync.current = null;
         setSyncing(false);
-        setSyncMessage(
-          result?.error ||
-            "The room did not respond. Check your connection and retry.",
+        const measurements = result.synchronization?.participants || [];
+        const maxError = Math.max(
+          0,
+          ...measurements.map((p) => p.alignmentMs || 0),
         );
-        return;
-      }
-      if (sourceFailed(videoErrorRef.current)) {
-        manualSync.current = null;
-        setSyncing(false);
         setSyncMessage(
-          "Device delays checked, but this source is unavailable. Retry the source or choose another link.",
+          `All ${measurements.length} devices aligned. Resuming together · maximum reported alignment ${maxError.toFixed(1)} ms (estimate).`,
         );
-        return;
-      }
-      const current = accept(latest.current, result.room);
-      if (result.synchronization) setLastCheck(result.synchronization);
-      latest.current = current;
-      setRoom((previous) => accept(previous, current));
-      request.confirmed = true;
-      request.adjusted = false;
-      synchronize();
-    });
+        synchronize();
+      },
+    );
   }, [status, synchronize]);
+  const enablePlayback = useCallback(() => {
+    const v = video.current;
+    if (!v || priming.current) return;
+    priming.current = true;
+    const restoreMuted = v.muted;
+    v.muted = true;
+    v.play()
+      .then(() => {
+        if (video.current !== v) return;
+        const r = latest.current;
+        if (!r?.playing || r.anchor > monotonic() + offsetRef.current)
+          v.pause();
+        blockedRef.current = false;
+        setBlocked(false);
+        setSyncMessage(
+          "Playback enabled on this device. Waiting for the host’s room timeline.",
+        );
+      })
+      .catch(() =>
+        setSyncMessage(
+          "This device still blocks playback. Allow it in your browser, then try again.",
+        ),
+      )
+      .finally(() => {
+        if (video.current === v) v.muted = restoreMuted;
+        priming.current = false;
+        syncRef.current();
+      });
+  }, []);
   syncRef.current = synchronize;
   useEffect(() => {
     if (status !== "Connected" && manualSync.current) {
@@ -794,48 +901,89 @@ function App() {
       );
     }
   };
+  const themeControl = (
+    <button
+      className="theme-toggle"
+      aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+      title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+    >
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        aria-hidden="true"
+      >
+        {theme === "dark" ? (
+          <>
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5" />
+          </>
+        ) : (
+          <path d="M20.5 13A8.5 8.5 0 0 1 11 3.5 8.5 8.5 0 1 0 20.5 13Z" />
+        )}
+      </svg>
+      <span>{theme === "dark" ? "Light" : "Dark"}</span>
+    </button>
+  );
   if (!room)
     return (
       <div className="landing">
         <header className="site-header">
           <a className="brand" href="/">
-            ◉{" "}
             <span>
               F<span className="accent">oyer</span>
             </span>
           </a>
-          <span className="pill">YOUR PEOPLE. YOUR FOYER.</span>
+          <span className="site-tagline">
+            Private watch and listening rooms
+          </span>
+          {themeControl}
         </header>
         <main className="welcome">
           <div className="hero-copy">
-            <div className="eyebrow">GOOD STORIES. BETTER COMPANY.</div>
+            <div className="eyebrow">WATCH / LISTEN / TOGETHER</div>
             <h1>
-              Different places.
+              Your music.
               <br />
-              Same <em>moment.</em>
+              Your people.
             </h1>
             <p>
-              Bring your people, press play, and make a night of it. A private
-              cinema with perfectly shared moments.
+              Start a room, invite friends, and share the same playback. Music,
+              video and conversation in one place.
             </p>
             <div className="hero-tags">
               <span>↔ Synchronized playback</span>
               <span>✦ Shared discovery</span>
               <span>♡ Live reactions</span>
             </div>
-            <div className="poster-scene">
-              <div className="scene-orbit"></div>
-              <span className="scene-caption">
-                NOW SHOWING
-                <br />
-                <strong>A place to press play together.</strong>
-              </span>
-              <span className="scene-badge">WATCH · LISTEN · BELONG</span>
+            <div className="landing-records" aria-hidden="true">
+              <div className="sleeve sleeve-one">
+                <span>01</span>
+                <strong>
+                  FOYER
+                  <br />
+                  SESSIONS
+                </strong>
+                <small>A listening room</small>
+              </div>
+              <div className="sleeve sleeve-two">
+                <span>02</span>
+                <strong>
+                  AFTER
+                  <br />
+                  HOURS
+                </strong>
+                <small>A watch room</small>
+              </div>
             </div>
           </div>
           <section className="entry-card">
-            <div className="eyebrow">THE BEST SEAT IS NEXT TO FRIENDS</div>
-            <h2>Welcome to Foyer.</h2>
+            <div className="eyebrow">GET STARTED</div>
+            <h2>Open a room</h2>
             <div className="mode-switch" aria-label="Choose room type">
               {(["watch", "listen"] as const).map((mode) => (
                 <button
@@ -913,11 +1061,11 @@ function App() {
     <div className={`app ${cinema ? "cinema" : ""}`}>
       <header className="site-header">
         <a className="brand" href="/">
-          ◉{" "}
           <span>
             F<span className="accent">oyer</span>
           </span>
         </a>
+        {themeControl}
         <div className="mode-switch room-mode" aria-label="Room mode">
           {(["watch", "listen"] as const).map((mode) => (
             <button
@@ -925,7 +1073,11 @@ function App() {
               className={
                 (room.settings.mode || "watch") === mode ? "active" : ""
               }
-              disabled={!host || status !== "Connected"}
+              disabled={
+                !host ||
+                status !== "Connected" ||
+                room.syncBarrier?.status === "waiting"
+              }
               onClick={() => command({ type: "mode", mode })}
             >
               {mode === "watch" ? "◉ Watch" : "♪ Listen"}
@@ -979,7 +1131,11 @@ function App() {
         <section className="stage">
           <div className="section-heading">
             <div>
-              <div className="eyebrow">THE SCREEN IS YOURS</div>
+              <div className="eyebrow">
+                {room.settings.mode === "listen"
+                  ? "NOW LISTENING"
+                  : "NOW WATCHING"}
+              </div>
               <h1>{room.media.title}</h1>
             </div>
             <button className="secondary" onClick={() => setCinema((v) => !v)}>
@@ -1072,8 +1228,8 @@ function App() {
               </span>
             </div>
             {blocked && (
-              <button className="autoplay primary" onClick={syncNow}>
-                Click to sync and play
+              <button className="autoplay primary" onClick={enablePlayback}>
+                Enable playback on this device
               </button>
             )}
             {videoError && (
@@ -1167,14 +1323,41 @@ function App() {
               onClick={syncNow}
               disabled={
                 room.media.kind === "external" ||
+                !host ||
+                room.syncBarrier?.status === "waiting" ||
                 status !== "Connected" ||
                 syncing
               }
               aria-describedby="sync-feedback"
             >
-              {syncing ? "Syncing…" : "↔ Sync me now"}
+              {syncing || room.syncBarrier?.status === "waiting"
+                ? "Syncing…"
+                : host
+                  ? "Sync room"
+                  : "Host controls sync"}
             </button>
           </div>
+          {room.syncBarrier && (
+            <div className="room-sync-banner" role="status">
+              <strong>
+                {room.syncBarrier.status === "waiting"
+                  ? "Room paused for synchronization"
+                  : "Room stays paused"}
+              </strong>
+              <p>
+                {room.syncBarrier.error ||
+                  "Every device must finish loading, align to the same timestamp, and acknowledge its timing checks before the shared restart."}
+              </p>
+              {host && room.syncBarrier.status === "waiting" && (
+                <button
+                  onClick={() => command({ type: "pause" })}
+                  disabled={status !== "Connected"}
+                >
+                  Cancel sync
+                </button>
+              )}
+            </div>
+          )}
           <p
             id="sync-feedback"
             className="sync-feedback"
@@ -1220,7 +1403,7 @@ function App() {
             </button>
             <details className="shortcut-help">
               <summary>Keyboard shortcuts</summary>
-              <p>Space play/pause · ← → seek · S sync · C cinema</p>
+              <p>Space play/pause · ← → seek · S host room sync · C cinema</p>
             </details>
           </div>
           {diagnostics && (
@@ -1375,14 +1558,14 @@ function App() {
               <section className="discovery panel">
                 <div className="section-heading">
                   <div>
-                    <div className="eyebrow">DISCOVER TOGETHER</div>
+                    <div className="eyebrow">LIBRARY</div>
                     <h2>
                       {room.settings.mode === "listen"
-                        ? "Your local listening library."
-                        : "Find your next watch."}
+                        ? "Local audio"
+                        : "Browse titles"}
                     </h2>
                   </div>
-                  <span className="pill">{catalog.length} samples</span>
+                  <span className="pill">{movies.length} matches</span>
                 </div>
                 <div className="search-row">
                   <input
@@ -1543,6 +1726,9 @@ function App() {
                               : "waiting for source"}
                             {measurement.autoplayBlocked
                               ? " · needs a click"
+                              : ""}
+                            {measurement.alignmentMs !== undefined
+                              ? ` · ${measurement.alignmentMs.toFixed(1)} ms alignment at check`
                               : ""}
                           </small>
                         )

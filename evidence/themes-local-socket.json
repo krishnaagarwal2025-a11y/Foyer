@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-10-13T06:27:16.193Z",
+  "transport": "Socket.IO WebSocket, socket-only; no HTML5 playback",
+  "url": "http://127.0.0.1:3001",
+  "participants": 10,
+  "commands": 90,
+  "warmupCommands": 9,
+  "method": "One Node monotonic clock. Start immediately before host emit; end in each recipient state callback. Includes the three-packet play preflight, validation, durable checkpoint and broadcast. Socket-only peers report synthetic source readiness; no video is played. Recipients exclude sender.",
+  "environment": {
+    "os": "Windows_NT 10.0.26200",
+    "node": "v24.15.0",
+    "cpu": "AMD Ryzen 5 5500U with Radeon Graphics         ",
+    "logicalCpus": 12,
+    "totalMemoryGB": 15.339912414550781,
+    "loadAverage": [
+      0,
+      0,
+      0
+    ]
+  },
+  "deliveryMs": {
+    "samples": 810,
+    "p50": 5.17910000000029,
+    "p95": 14.477200000000266,
+    "maximum": 18.07250000000022
+  },
+  "targetP95Ms": 250,
+  "passed": true
+}

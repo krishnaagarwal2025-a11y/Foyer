@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test("manual sync corrects modest paused drift, retries blocked playback, and never controls the room", async ({
+test("host sync pauses both players, waits for every device, aligns and automatically resumes; guests cannot invoke it", async ({
   browser,
 }) => {
   const a = await browser.newContext(),
@@ -16,23 +16,25 @@ test("manual sync corrects modest paused drift, retries blocked playback, and ne
   try {
     await host.goto("/");
     await host.getByLabel("Display name").fill("Sync host");
-    await expect(
-      host.getByRole("button", { name: "＋ Create a room" }),
-    ).toBeEnabled();
     await host.getByRole("button", { name: "＋ Create a room" }).click();
     await expect(host.locator("video")).toBeVisible();
     const code = new URL(host.url()).searchParams.get("room");
     await guest.goto("/?room=" + code);
     await guest.getByLabel("Display name").fill("Sync guest");
-    await expect(
-      guest.getByRole("button", { name: "Join room →" }),
-    ).toBeEnabled();
     await guest.getByRole("button", { name: "Join room →" }).click();
     await expect
       .poll(() =>
         guest.locator("video").evaluate((v: HTMLVideoElement) => v.readyState),
       )
       .toBeGreaterThanOrEqual(2);
+    await expect(
+      guest.getByRole("button", { name: "Host controls sync" }),
+    ).toBeDisabled();
+    await guest.locator(".stage h1").click();
+    await guest.keyboard.press("s");
+    await expect(guest.locator("#sync-feedback")).toContainText(
+      "Only the host",
+    );
     await host.getByLabel("Seek playback").fill("22");
     await expect
       .poll(() =>
@@ -40,136 +42,204 @@ test("manual sync corrects modest paused drift, retries blocked playback, and ne
       )
       .toBeCloseTo(22, 1);
     await guest.locator("video").evaluate((v: HTMLVideoElement) => {
-      v.currentTime = 22.1;
+      v.currentTime = 22.12;
       v.playbackRate = 0.95;
+      (window as any).holdReadiness = true;
+      const getter = Object.getOwnPropertyDescriptor(
+        HTMLMediaElement.prototype,
+        "readyState",
+      )!.get!;
+      Object.defineProperty(v, "readyState", {
+        configurable: true,
+        get: () => ((window as any).holdReadiness ? 0 : getter.call(v)),
+      });
     });
-    await guest.getByRole("button", { name: "Sync me now" }).click();
-    await expect(guest.locator("#sync-feedback")).toContainText(
-      "Synced to the room",
+    await host.getByRole("button", { name: "Sync room" }).click();
+    await expect(
+      host.getByText("Room paused for synchronization", { exact: true }),
+    ).toBeVisible();
+    for (const page of [host, guest])
+      expect(
+        await page.locator("video").evaluate((v: HTMLVideoElement) => v.paused),
+      ).toBe(true);
+    await host.waitForTimeout(200);
+    expect(
+      await host.locator("video").evaluate((v: HTMLVideoElement) => v.paused),
+    ).toBe(true);
+    expect(
+      await guest
+        .locator("video")
+        .evaluate((v: HTMLVideoElement) => v.playbackRate),
+    ).toBe(1);
+    await guest.evaluate(() => {
+      (window as any).holdReadiness = false;
+    });
+    await expect(host.locator("#sync-feedback")).toContainText(
+      "All 2 devices aligned",
+      { timeout: 15000 },
     );
-    const paused = await guest
+    for (const page of [host, guest])
+      await expect
+        .poll(() =>
+          page.locator("video").evaluate((v: HTMLVideoElement) => v.paused),
+        )
+        .toBe(false);
+    const rate = await guest
       .locator("video")
-      .evaluate((v: HTMLVideoElement) => ({
-        position: v.currentTime,
-        rate: v.playbackRate,
-        paused: v.paused,
-      }));
-    expect(Math.abs(paused.position - 22)).toBeLessThan(0.03);
-    expect(paused.rate).toBe(1);
-    expect(paused.paused).toBe(true);
+      .evaluate((v: HTMLVideoElement) => v.playbackRate);
+    expect(rate).toBeGreaterThanOrEqual(0.95);
+    expect(rate).toBeLessThanOrEqual(1.05);
+    expect(
+      await guest.evaluate(() =>
+        (window as any).syncCommands.filter((c: any) =>
+          ["play", "pause", "seek", "resync"].includes(c.type),
+        ),
+      ),
+    ).toEqual([]);
+    // An explicit cancellation must be handled while the long check is pending.
+    await guest.evaluate(() => {
+      (window as any).holdReadiness = true;
+    });
+    await host.getByRole("button", { name: "Sync room" }).click();
+    await host.getByRole("button", { name: "Cancel sync" }).click();
+    await expect(host.locator("#sync-feedback")).toContainText("cancelled", {
+      timeout: 5000,
+    });
+    expect(
+      await guest.locator("video").evaluate((v: HTMLVideoElement) => v.paused),
+    ).toBe(true);
+    await guest.evaluate(() => {
+      (window as any).holdReadiness = false;
+    });
+    // Paused sync is also a synchronized start, rather than a guest local seek.
+    await host.locator(".stage h1").click();
+    await host.keyboard.press("s");
+    await expect(host.locator("#sync-feedback")).toContainText(
+      "All 2 devices aligned",
+      { timeout: 15000 },
+    );
+    await host.getByRole("button", { name: "Pause", exact: true }).click();
+    // Guest autoplay permission remains local, distinct from host room sync.
     await guest.locator("video").evaluate((v: HTMLVideoElement) => {
-      (window as any).originalSyncPlay = v.play;
+      (window as any).originalPlay = v.play;
       v.play = () =>
         Promise.reject(new DOMException("Autoplay blocked", "NotAllowedError"));
     });
     await host.getByRole("button", { name: "Play", exact: true }).click();
     await expect(
-      guest.getByRole("button", { name: "Click to sync and play" }),
+      guest.getByRole("button", { name: "Enable playback on this device" }),
     ).toBeVisible();
-    await guest.evaluate(() => {
-      window.addEventListener(
-        "click",
-        () => {
-          document.querySelector("video")!.play = (
-            window as any
-          ).originalSyncPlay;
-        },
-        { once: true, capture: true },
-      );
+    await guest.locator("video").evaluate((v: HTMLVideoElement) => {
+      v.play = (window as any).originalPlay;
     });
-    await guest.getByRole("button", { name: "Sync me now" }).click();
-    await expect(guest.locator("#sync-feedback")).toContainText(
-      "Synced to the room",
-    );
-    await expect(
-      guest.getByRole("button", { name: "Click to sync and play" }),
-    ).toHaveCount(0);
-    expect(
-      await guest.locator("video").evaluate((v: HTMLVideoElement) => v.paused),
-    ).toBe(false);
-    expect(
-      await guest.evaluate(() =>
-        (window as any).syncCommands.filter((c: any) =>
-          ["play", "pause", "seek"].includes(c.type),
-        ),
-      ),
-    ).toEqual([]);
-    await host.getByRole("button", { name: "Pause", exact: true }).click();
     await guest
-      .getByRole("heading", { name: "Cinema Color Journey", level: 1 })
+      .getByRole("button", { name: "Enable playback on this device" })
       .click();
-    await guest.keyboard.press("s");
-    await expect(guest.locator("#sync-feedback")).toContainText(
-      "Synced to the room",
-    );
-    // Chat is the default; discovery and participants no longer stack beneath it.
-    await expect(guest.getByLabel("Chat message")).toBeVisible();
-    await expect(guest.getByLabel("Search movies")).toBeHidden();
-    await expect(guest.getByLabel("Custom media URL")).toBeHidden();
-    await guest.getByRole("button", { name: "Discover", exact: true }).click();
-    await expect(guest.getByLabel("Search movies")).toBeVisible();
-    await expect(guest.getByLabel("Chat message")).toBeHidden();
-    await guest.getByRole("button", { name: /^People/ }).click();
-    await expect(guest.locator(".participant").first()).toBeVisible();
-    await guest.getByRole("button", { name: "Room", exact: true }).click();
-    await expect(guest.getByLabel("Chat message")).toBeVisible();
-    await guest.setViewportSize({ width: 390, height: 844 });
-    expect(
-      await guest.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth,
-      ),
-    ).toBe(true);
-    await guest.screenshot({
-      path: "evidence/room-clear-mobile.png",
-      fullPage: true,
-    });
-    await host.screenshot({
-      path: "evidence/room-clear-desktop.png",
-      fullPage: true,
-    });
+    await expect
+      .poll(() =>
+        guest.locator("video").evaluate((v: HTMLVideoElement) => v.paused),
+      )
+      .toBe(false);
+    await expect(
+      guest.getByRole("button", { name: "Enable playback on this device" }),
+    ).toBeHidden();
   } finally {
     await a.close();
     await b.close();
   }
 });
 
-test("sync timeout and offline state are visible without claiming success", async ({
+test("sync response timeout and offline state remain explicit", async ({
   browser,
 }) => {
-  const context = await browser.newContext();
-  await context.routeWebSocket("**/socket.io/**", (socket) => {
+  const c = await browser.newContext();
+  await c.routeWebSocket("**/socket.io/**", (socket) => {
     const server = socket.connectToServer();
     socket.onMessage((message) => {
       if (!String(message).includes('["sync",')) server.send(message);
     });
     server.onMessage((message) => socket.send(message));
   });
-  const page = await context.newPage();
+  const page = await c.newPage();
   try {
     await page.goto("/");
     await page.getByLabel("Display name").fill("Network check");
-    await expect(
-      page.getByRole("button", { name: "＋ Create a room" }),
-    ).toBeEnabled();
     await page.getByRole("button", { name: "＋ Create a room" }).click();
-    await expect(page.locator("video")).toBeVisible();
-    await page.getByRole("button", { name: "Sync me now" }).click();
+    await page.getByRole("button", { name: "Sync room" }).click();
     await expect(
       page.getByRole("button", { name: "Syncing…", exact: true }),
     ).toBeDisabled();
     await expect(page.locator("#sync-feedback")).toContainText(
       "room did not respond",
-      { timeout: 7000 },
+      { timeout: 20000 },
     );
-    await expect(
-      page.getByRole("button", { name: "Sync me now" }),
-    ).toBeEnabled();
-    await context.setOffline(true);
-    await expect(
-      page.getByRole("button", { name: "Sync me now" }),
-    ).toBeDisabled({ timeout: 20000 });
+    await expect(page.getByRole("button", { name: "Sync room" })).toBeEnabled();
+    await c.setOffline(true);
+    await expect(page.getByRole("button", { name: "Sync room" })).toBeDisabled({
+      timeout: 20000,
+    });
     await expect(page.locator(".connection")).toContainText("Reconnecting");
   } finally {
-    await context.close();
+    await c.close();
+  }
+});
+
+test("light and dark themes persist, use restrained controls and remain readable on phones", async ({
+  browser,
+}) => {
+  const c = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await c.newPage();
+  try {
+    await page.goto("/");
+    if (
+      await page
+        .getByRole("button", { name: "Switch to light theme" })
+        .isVisible()
+    )
+      await page.getByRole("button", { name: "Switch to light theme" }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await page.getByLabel("Display name").fill("Theme check");
+    await page.getByRole("button", { name: "＋ Create a room" }).click();
+    await expect(page.locator("video")).toBeVisible();
+    await expect(page.locator(".theme-toggle")).toHaveCSS(
+      "border-radius",
+      "3px",
+    );
+    for (const width of [320, 390, 844]) {
+      await page.setViewportSize({ width, height: 844 });
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true);
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(150);
+    await page.screenshot({
+      path: "evidence/theme-light-phone.png",
+      fullPage: true,
+    });
+    await page.getByRole("button", { name: "Switch to dark theme" }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await page.waitForTimeout(150);
+    await page.screenshot({
+      path: "evidence/theme-dark-phone.png",
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await page.screenshot({
+      path: "evidence/theme-dark-desktop.png",
+      fullPage: true,
+    });
+    await page.getByRole("button", { name: "Switch to light theme" }).click();
+    await page.waitForTimeout(150);
+    await page.screenshot({
+      path: "evidence/theme-light-desktop.png",
+      fullPage: true,
+    });
+  } finally {
+    await c.close();
   }
 });

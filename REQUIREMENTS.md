@@ -82,3 +82,16 @@ Final public protocol verification: all seven public browser workflows passed. T
 - `scripts/check-song-switch.mjs` (`npm run providers:switch`): separate actual provider smoke test, capturing decoded playback state and uncaught errors across repeated YouTube mounts and direct-audio transitions. Its API-demo reuse and autoplay/mobile-emulation limitations are explicit in each JSON report.
 
 Final verification for this update: 51 unit tests, nine local workflows, three targeted source-transition checks and all nine public workflows verified (eight in the full run plus the phone workflow's successful targeted retry). Build/types pass. `evidence/mobile-verification-vercel.json` records all 17 layout checks and actual multi-user demo audio/chat/sync. `evidence/song-switch-vercel-after.json` records four actual playing sources and confirmed manual sync with no browser errors. The original public phone readiness assertion was too short at 5s; network diagnostics showed loading without a media error, and the 20s assertion passes. These are browser emulations, not physical phone/Safari certification.
+
+## Current theme, host-barrier and in-app search requirements (2026-10-13)
+
+| User requirement | Code | Verification |
+|---|---|---|
+| Dark/light themes | `public/theme.js`, `src/design.css`, `src/main.tsx`; themed help page | Saved/system preference, reload persistence, phone widths and reviewed light/dark screenshots in `tests/browser/sync.spec.ts` |
+| Only host can initiate sync | Engine `prepareRoomSync`, `resync`/server-only finish; public socket payload validation; guest UI disabled | Guest/raw-socket denial even with collaborative control in `tests/room-sync.test.ts` and actual ten-socket `tests/app-sync.test.ts` |
+| Pause all, handshake/align, automatic common resume | `Room.syncBarrier`, frozen target, complete 3-packet readiness rounds, ≤80ms reported paused alignment, future anchor, native one-time resume catch-up | Actual two-browser pause/wait/cancel/resume tests; ten native contexts/five video + five audio trials, `evidence/host-sync-local-browser.json` |
+| Failure handling and integrity | Failed/expired barriers remain paused; membership, revision, host, operation and stale-report checks; responsive cancellation | Engine/application unit tests; browser held readiness, source failure and timeout/offline tests |
+| Search song and play without copying a link/tab | `server/youtube-search.ts` metadata-only YouTube.js, bounded/coalesced search, stored validated IDs, prepared selected-result playback in `server/app.ts` / `src/MusicDiscovery.tsx` | Injected search + official-API-shaped browser fixture, raw application API/role tests, and actual Finding Her search/embed playback in `evidence/music-search-local-live.json` |
+| Sharper, simpler streaming/music UI | Theme tokens, 3px buttons, flatter rows/cards, simpler copy, compact phone controls | Light/dark desktop/phone screenshot review and 320–430px/landscape overflow checks |
+
+57 local unit/integration tests and all 11 browser workflows pass. These requirements supersede historical guest-only/manual-local sync and external-tab music search descriptions above. Public verification follows deployment; no claim of literal 0ms or physical phone/Safari/output testing is made.
