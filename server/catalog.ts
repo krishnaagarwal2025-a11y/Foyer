@@ -1,4 +1,14 @@
 import type { Movie } from "../shared/types.js";
+export const emptyWatch: Movie = {
+  id: "empty-watch",
+  kind: "empty",
+  title: "Choose a video",
+  description: "Add a link or choose a video from Discover to begin.",
+  genres: [],
+  tags: [],
+  duration: 0,
+  color: "#252535",
+};
 const titles = [
   "Neon Afterglow",
   "The Quiet Orbit",

@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
-import { catalog } from "./catalog.js";
+import { catalog, emptyWatch } from "./catalog.js";
 import {
   normalizeSource,
   isPlayable,
@@ -215,7 +215,7 @@ export class Engine {
         media:
           v.mode === "listen"
             ? catalog.find((m) => m.id === "demo-audio")!
-            : catalog[0],
+            : emptyWatch,
         mediaRevision: 0,
         playing: false,
         position: 0,
@@ -346,6 +346,8 @@ export class Engine {
       ?.get(`${session.id}:${parsed.data.opId}`);
     if (duplicate) return duplicate;
     const room = current.room!;
+    if (room.media.kind === "empty")
+      return { ok: false, error: "Choose a video first." };
     if (parsed.data.mediaRevision !== room.mediaRevision)
       return { ok: false, error: "Media changed. Sync and try again." };
     if (room.hostId !== session.id && !room.settings.collaborative)
@@ -367,6 +369,8 @@ export class Engine {
     if (duplicate) return duplicate;
     if (parsed.data.mediaRevision !== current.room!.mediaRevision)
       return { ok: false, error: "Media changed. Retry room sync." };
+    if (current.room!.media.kind === "empty")
+      return { ok: false, error: "Choose a video first." };
     return current;
   }
   apply(
@@ -482,6 +486,8 @@ export class Engine {
     };
     switch (c.type) {
       case "resync":
+        if (r.media.kind === "empty")
+          return { ok: false, error: "Choose a video first." };
         if (mediaRevision !== r.mediaRevision)
           return { ok: false, error: "Media changed. Retry room sync." };
         r.position = expectedPosition(r, this.now());
@@ -576,9 +582,9 @@ export class Engine {
         if (c.mode === "listen")
           r.queue = r.queue.filter((item) => isListeningSource(item.movie));
         setMedia(
-          catalog.find(
-            (m) => m.id === (c.mode === "listen" ? "demo-audio" : "local-demo"),
-          )!,
+          c.mode === "listen"
+            ? catalog.find((m) => m.id === "demo-audio")!
+            : emptyWatch,
         );
         break;
       case "source": {
@@ -637,6 +643,8 @@ export class Engine {
         p.playbackStatus = c.status;
         break;
       case "play":
+        if (r.media.kind === "empty")
+          return { ok: false, error: "Choose a video first." };
         r.position = expectedPosition(r, this.now());
         if (r.position >= r.media.duration) r.position = 0;
         r.anchor =
@@ -655,6 +663,8 @@ export class Engine {
         delete r.syncBarrier;
         break;
       case "seek":
+        if (r.media.kind === "empty")
+          return { ok: false, error: "Choose a video first." };
         r.position = Math.min(c.position, r.media.duration);
         r.anchor = r.playing ? Math.max(this.now(), r.anchor) : this.now();
         break;

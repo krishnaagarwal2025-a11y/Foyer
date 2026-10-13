@@ -117,6 +117,26 @@ try {
       room: window.foyerMusicCheckState,
     }))
     .catch(() => null);
+  report.actualMediaOnFailure = await page
+    ?.frameLocator(".provider-frame iframe")
+    .locator("video")
+    .evaluate(
+      (v) => ({
+        position: v.currentTime,
+        paused: v.paused,
+        readyState: v.readyState,
+        seeking: v.seeking,
+        networkState: v.networkState,
+        buffered: Array.from({ length: v.buffered.length }, (_, i) => [
+          v.buffered.start(i),
+          v.buffered.end(i),
+        ]),
+        error: v.error?.message,
+      }),
+      undefined,
+      { timeout: 1000 },
+    )
+    .catch(() => null);
 } finally {
   await browser.close();
   report.completedAt = new Date().toISOString();

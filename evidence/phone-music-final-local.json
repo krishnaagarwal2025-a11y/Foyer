@@ -1,0 +1,91 @@
+{
+  "url": "http://127.0.0.1:3001",
+  "query": "finding her",
+  "startedAt": "2026-10-13T08:45:57.586Z",
+  "passed": false,
+  "pageErrors": [],
+  "conditions": "Actual anonymous YouTube Music metadata search and official YouTube embed playback, one touch-emulated Chromium client with autoplay allowed. No other tab, copied URL, API key, account, audio extraction or media proxy. Not physical mobile/Safari or a multi-device timing benchmark.",
+  "searchResults": 20,
+  "selectedTitle": "Finding Her",
+  "error": "locator.evaluate: Timeout 30000ms exceeded.",
+  "diagnostics": {
+    "feedback": "",
+    "alerts": [],
+    "url": "http://127.0.0.1:3001/?room=9426B1",
+    "visibleText": "Foyer\n◉ Watch\n♪ Listen\nROOM\n9426B1\n↗ Invite\nConnected\nNOW LISTENING\nFinding Her\n▣ Cinema mode\nThe streaming player did not become ready. Retry or choose a different source.\nRetry source\nUse local demo\n\nYouTube · Provided by YouTube · Open original video ↗\n\nⅡ\n0:00\n3:27\n🔊\nSync room\n\nDelay check: 0/1 sources ready · waiting devices will catch up.\n\nYou’re hosting · Host controls playback\n❤️\n🔥\n😂\n👏\n😮\n🎉\nShow sync diagnostics\nKeyboard shortcuts\n＋ Add a link\nRoom\nDiscover\nPeople\n1\nMUSIC SEARCH\nFind a song\nYouTube Music\nAudius\nNavidrome (not configured)\nSearch music\n\nChoose a result to play it here. Everyone can add to the queue.\n\nFinding Her\nKushagra, Bharath, Saaheal · 3:27\nPlay\n＋\nFinding Her (Female Version) (From \"UR Debut\")\nTanishka Bahl, Kushagra, Bharath, Saaheal · 3:27\nPlay\n＋\nFINDING HER\nTrendBlaze Music · 5:59\nPlay\n＋\nFinding her By Jay\nJo_Muzix · 2:16\nPlay\n＋\nfinding her\nAesthetic · 2:22\nPlay\n＋\nFinding Her\nAngela DeVille · 4:00\nPlay\n＋\nFinding Her\nDillon Thornton · 3:51\nPlay\n＋\nGood luck finding her\nLorraine · 4:23\nPlay\n＋\nFinding Her (Piano Instrumental)\nPakhi Piano Instrumentals · 3:33\nPlay\n＋\nStill Finding Her\nHarsh Miyani · 4:08\nPlay\n＋\nFinding Her\nKumar Pk · 4:39\nPlay\n＋\nFinding Her\nRimo Diaz · 2:24\nPlay\n＋\nFinding Her Again\nMarinda · 4:06\nPlay\n＋\nFinding Her Again\nKiki · 6:16\nPlay\n＋\nFinding Her\nVini Contreas · 2:15\nPlay\n＋\nFinding Her\nLarry Castle · 1:15\nPlay\n＋\nfinding her edge\nLil Barberi · 2:17\nPlay\n＋\nFinding her\nPrakhar Painuly · 2:39\nPlay\n＋\nSB Finding Her\nTyroneus · 1:46\nPlay\n＋\nFinding Her Edge\nSuicidal Biscuits · 2:54\nPlay\n＋\nAdd a song link\n\nYouTube results use the official video player. Some tracks restrict embedding. Audius carries artist-published music.\n\nLIBRARY\nLocal audio\n1 matches\nAll\nSci-Fi\nDrama\nAnimation\nDocumentary\nThriller\nAdventure\nMystery\nComedy\nCozy\nWonder\nEnergetic\nThoughtful\nTogether\nEscape\nPlayable only\nAbout these recommendations\n01\n♪ LOCAL AUDIO\nFoyer · Evening Keys\nAmbient · 1 min\nAbout this title\n＋ Queue\nListen\nFoyer · Together, from anywhere.\nRoom 9426B1",
+    "frames": [],
+    "room": {
+      "code": "9426B1",
+      "hostId": "7451c53a-832b-4534-b914-271e40925c2d",
+      "participants": [
+        {
+          "id": "7451c53a-832b-4534-b914-271e40925c2d",
+          "name": "Live music search check",
+          "joinedAt": 1791881158894.8306,
+          "connected": true,
+          "preferences": [],
+          "drift": 27.036517578125
+        }
+      ],
+      "media": {
+        "id": "youtube:PZtSnQBsBW0",
+        "sourceId": "PZtSnQBsBW0",
+        "provider": "youtube",
+        "kind": "video",
+        "title": "Finding Her",
+        "artist": "Kushagra, Bharath, Saaheal",
+        "duration": 207,
+        "durationEstimated": false,
+        "genres": [
+          "Music"
+        ],
+        "tags": [
+          "YouTube Music"
+        ],
+        "description": "YouTube Music search result. Plays in the official visible YouTube player; availability depends on the uploader.",
+        "color": "#71717a",
+        "url": "https://www.youtube.com/watch?v=PZtSnQBsBW0",
+        "artwork": "https://yt3.googleusercontent.com/XEpKU4CHyyIkE33zKcYJz8uMrZv9W03Q2SKx7RTE3_bj1ZSBjZ_sIUPdcglS2_1wWNZTo09hHNpmo0R8Dg=w120-h120-l90-rj"
+      },
+      "mediaRevision": 1,
+      "playing": true,
+      "position": 0,
+      "anchor": 1791881171986.4285,
+      "version": 11,
+      "queue": [],
+      "polls": [],
+      "chat": [],
+      "bookmarks": [],
+      "settings": {
+        "collaborative": false,
+        "autoAdvance": false,
+        "mode": "listen"
+      },
+      "lastOperation": {
+        "id": "de6a1905-13c5-4895-afc3-bca07eaaf2c1",
+        "type": "diagnostics"
+      },
+      "synchronization": {
+        "id": "39e6a833-db48-4a83-8128-99396a1cfb52",
+        "code": "9426B1",
+        "reason": "play",
+        "checkedAt": 1791881171866.0981,
+        "mediaRevision": 1,
+        "participants": [
+          {
+            "participantId": "7451c53a-832b-4534-b914-271e40925c2d",
+            "rttMs": 5.3202464843780035,
+            "samples": 3,
+            "ready": false,
+            "autoplayBlocked": false,
+            "position": 0,
+            "paused": true
+          }
+        ],
+        "startAt": 1791881171986.4285
+      }
+    }
+  },
+  "actualMediaOnFailure": null,
+  "completedAt": "2026-10-13T08:46:43.118Z"
+}

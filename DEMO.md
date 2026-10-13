@@ -36,3 +36,5 @@ Create two contexts and open People. Normal Play performs three timing exchanges
 Open the production link on a phone, choose Listen, then Discover. Search and select songs inside Foyer. Change songs while loading; the page stays visible and mute preference carries forward. Test both themes and narrow layout. A second participant can chat and queue; only the host starts room sync. Refresh existing tabs before evaluating the new protocol.
 
 For a repeatable live check, run `npm run providers:switch` with `DEMO_URL` set to the server being evaluated. It cycles public YouTube demo revisions, a direct local audio source, and back to YouTube, recording actual decoded/playing state plus uncaught browser errors. This checks provider lifecycle behavior rather than song-catalog availability or measured LAN latency.
+
+Watch rooms now open with an empty screen. Add a link or select a playable title in Discover before using playback controls. The local demo is optional; existing rooms retain their selected media. Listen rooms retain their audio default.

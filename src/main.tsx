@@ -137,7 +137,7 @@ function App() {
       type: string;
       version: number;
     } | null>(null);
-  latest.current = room;
+  latest.current = room ? accept(latest.current, room) : null;
   selfRef.current = self;
   blockedRef.current = blocked;
   videoErrorRef.current = videoError;
@@ -320,6 +320,13 @@ function App() {
     s.on("disconnect", () => setStatus("Reconnecting"));
     s.on("connect_error", () => setStatus("Reconnecting"));
     s.on("state", (r: Room) => {
+      const authoritative = accept(latest.current, r);
+      latest.current = authoritative;
+      if (
+        manualSync.current &&
+        manualSync.current.id === authoritative.syncBarrier?.id
+      )
+        manualSync.current.confirmed = true;
       if (
         r.lastOperation &&
         ["play", "pause", "seek"].includes(r.lastOperation.type) &&
@@ -544,6 +551,12 @@ function App() {
       );
     }
     if (sourceFailed(videoErrorRef.current)) return;
+    // A local host pause must not be undone by the previous playing snapshot
+    // while the authoritative pause is travelling through the network.
+    if (request && !request.confirmed) {
+      if (v && !v.paused) v.pause();
+      return;
+    }
     if (
       !r ||
       !v ||
@@ -686,7 +699,7 @@ function App() {
       setSyncMessage("Reconnect before syncing your player.");
       return;
     }
-    if (r.media.kind === "external") return;
+    if (r.media.kind === "external" || r.media.kind === "empty") return;
     if (r.hostId !== selfRef.current) {
       setSyncMessage("Only the host can synchronize the room.");
       return;
@@ -1217,18 +1230,22 @@ function App() {
             </PlayerBoundary>
             <div className="player-top">
               <span className="pill">
-                {room.playing
-                  ? room.anchor > monotonic() + offsetRef.current
-                    ? "◷ STARTING TOGETHER"
-                    : "● PLAYING TOGETHER"
-                  : "Ⅱ PAUSED"}
+                {room.media.kind === "empty"
+                  ? "CHOOSE A VIDEO"
+                  : room.playing
+                    ? room.anchor > monotonic() + offsetRef.current
+                      ? "◷ STARTING TOGETHER"
+                      : "● PLAYING TOGETHER"
+                    : "Ⅱ PAUSED"}
               </span>
               <span className="pill">
-                {room.media.kind === "external"
-                  ? "Companion required"
-                  : Math.abs(drift) <= 0.5
-                    ? "In sync"
-                    : "Catching up"}
+                {room.media.kind === "empty"
+                  ? "No video selected"
+                  : room.media.kind === "external"
+                    ? "Companion required"
+                    : Math.abs(drift) <= 0.5
+                      ? "In sync"
+                      : "Catching up"}
               </span>
             </div>
             {blocked && (
@@ -1289,7 +1306,9 @@ function App() {
             <button
               className="play-button"
               aria-label={room.playing ? "Pause" : "Play"}
-              disabled={!canControl || preparingPlay}
+              disabled={
+                !canControl || preparingPlay || room.media.kind === "empty"
+              }
               onClick={() => command({ type: room.playing ? "pause" : "play" })}
             >
               {room.playing ? "Ⅱ" : "▶"}
@@ -1302,7 +1321,7 @@ function App() {
               max={room.media.duration}
               step="0.1"
               value={Math.min(position, room.media.duration)}
-              disabled={!canControl}
+              disabled={!canControl || room.media.kind === "empty"}
               onChange={(e) => {
                 setPosition(Number(e.target.value));
                 command({ type: "seek", position: Number(e.target.value) });
@@ -1327,6 +1346,7 @@ function App() {
               onClick={syncNow}
               disabled={
                 room.media.kind === "external" ||
+                room.media.kind === "empty" ||
                 !host ||
                 room.syncBarrier?.status === "waiting" ||
                 status !== "Connected" ||

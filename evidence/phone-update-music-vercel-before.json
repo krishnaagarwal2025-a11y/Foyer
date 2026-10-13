@@ -1,0 +1,93 @@
+{
+  "url": "https://foyer-cyan.vercel.app",
+  "query": "finding her",
+  "startedAt": "2026-10-13T07:45:30.570Z",
+  "passed": false,
+  "pageErrors": [],
+  "conditions": "Actual anonymous YouTube Music metadata search and official YouTube embed playback, one touch-emulated Chromium client with autoplay allowed. No other tab, copied URL, API key, account, audio extraction or media proxy. Not physical mobile/Safari or a multi-device timing benchmark.",
+  "searchResults": 20,
+  "selectedTitle": "Finding Her",
+  "beforeSync": {
+    "position": 3.549018,
+    "paused": false,
+    "readyState": 4,
+    "videoWidth": 480,
+    "videoHeight": 480
+  },
+  "syncTrials": [],
+  "error": "page.waitForFunction: Timeout 18000ms exceeded.",
+  "diagnostics": {
+    "feedback": "Playback remains paused. Not ready: Live music search check. Enable playback or wait for loading, then retry.",
+    "alerts": [],
+    "url": "https://foyer-cyan.vercel.app/?room=B94DDB",
+    "visibleText": "Foyer\n◉ Watch\n♪ Listen\nROOM\nB94DDB\n↗ Invite\nConnected\nNOW LISTENING\nFinding Her\n▣ Cinema mode\nBuffering… playback will catch up when ready.\nRetry source\nUse local demo\n\nYouTube · Provided by YouTube · Open original video ↗\n\n▶\n0:03\n3:27\n🔊\nSync room\nRoom stays paused\n\nPlayback remains paused. Not ready: Live music search check. Enable playback or wait for loading, then retry.\n\nPlayback remains paused. Not ready: Live music search check. Enable playback or wait for loading, then retry.\n\nDelay check: 0/1 sources ready · waiting devices will catch up.\n\nYou’re hosting · Host controls playback\n❤️\n🔥\n😂\n👏\n😮\n🎉\nShow sync diagnostics\nKeyboard shortcuts\n＋ Add a link\nRoom\nDiscover\nPeople\n1\nMUSIC SEARCH\nFind a song\nYouTube Music\nAudius\nNavidrome (not configured)\nSearch music\n\nChoose a result to play it here. Everyone can add to the queue.\n\nFinding Her\nKushagra, Bharath, Saaheal · 3:27\nPlay\n＋\nFinding Her (Female Version) (From \"UR Debut\")\nTanishka Bahl, Kushagra, Bharath, Saaheal · 3:27\nPlay\n＋\nFinding Her Not\nPogo · 3:14\nPlay\n＋\nThinking of You\nAP Dhillon · 3:01\nPlay\n＋\nFinding Her\nKumar Pk · 4:39\nPlay\n＋\nFINDING HER\nTrendBlaze Music · 5:59\nPlay\n＋\nFinding Her Rodeo\nYouTube Music · 3:04\nPlay\n＋\nFinding her\nPrakhar Painuly · 2:39\nPlay\n＋\nfinding her\nAesthetic · 2:22\nPlay\n＋\nFinding her By Jay\nJo_Muzix · 2:16\nPlay\n＋\nFinding Her\nVini Contreas · 2:15\nPlay\n＋\nFinding Her Lost Love (feat. Andrew Pearce)\nKaptain · 1:06\nPlay\n＋\nFinding Her\nRimo Diaz · 2:24\nPlay\n＋\nFinding Her\nxPanda · 2:36\nPlay\n＋\nfinding her answer\nDΛRKNΣSS · 4:18\nPlay\n＋\nFinding Her Way\nYouTube Music · 3:23\nPlay\n＋\nFinding Her Clit\nShat · 0:47\nPlay\n＋\nNothing to See ('Finding Her' The Original Videogame Soundtrack)\nCian Byrne · 2:10\nPlay\n＋\nFinding Her Tears\nBui Ttung · 2:58\nPlay\n＋\nFinding Her Voice (Soul Blues)\nScore Icons Blues · 4:59\nPlay\n＋\nAdd a song link\n\nYouTube results use the official video player. Some tracks restrict embedding. Audius carries artist-published music.\n\nLIBRARY\nLocal audio\n1 matches\nAll\nSci-Fi\nDrama\nAnimation\nDocumentary\nThriller\nAdventure\nMystery\nComedy\nCozy\nWonder\nEnergetic\nThoughtful\nTogether\nEscape\nPlayable only\nAbout these recommendations\n01\n♪ LOCAL AUDIO\nFoyer · Evening Keys\nAmbient · 1 min\nAbout this title\n＋ Queue\nListen\nFoyer · Together, from anywhere.\nRoom B94DDB",
+    "frames": [
+      "https://www.youtube.com/embed/PZtSnQBsBW0?playsinline=1&origin=https%3A%2F%2Ffoyer-cyan.vercel.app&rel=0&enablejsapi=1&widgetid=1&forigin=https%3A%2F%2Ffoyer-cyan.vercel.app%2F%3Froom%3DB94DDB&aoriginsup=1&vf=1"
+    ],
+    "room": {
+      "anchor": 1791877537550.9922,
+      "bookmarks": [],
+      "chat": [],
+      "code": "B94DDB",
+      "hostId": "233f1019-a042-45fb-b5ce-a26cef03133a",
+      "lastOperation": {
+        "id": "9ff5f7fa-eaed-4890-bb2d-0bedf010e26c",
+        "type": "diagnostics"
+      },
+      "media": {
+        "artist": "Kushagra, Bharath, Saaheal",
+        "artwork": "https://yt3.googleusercontent.com/XEpKU4CHyyIkE33zKcYJz8uMrZv9W03Q2SKx7RTE3_bj1ZSBjZ_sIUPdcglS2_1wWNZTo09hHNpmo0R8Dg=w120-h120-l90-rj",
+        "color": "#71717a",
+        "description": "YouTube Music search result. Plays in the official visible YouTube player; availability depends on the uploader.",
+        "duration": 207,
+        "durationEstimated": false,
+        "genres": [
+          "Music"
+        ],
+        "id": "youtube:PZtSnQBsBW0",
+        "kind": "video",
+        "provider": "youtube",
+        "sourceId": "PZtSnQBsBW0",
+        "tags": [
+          "YouTube Music"
+        ],
+        "title": "Finding Her",
+        "url": "https://www.youtube.com/watch?v=PZtSnQBsBW0"
+      },
+      "mediaRevision": 1,
+      "participants": [
+        {
+          "connected": true,
+          "drift": -0.17636159570312504,
+          "id": "233f1019-a042-45fb-b5ce-a26cef03133a",
+          "joinedAt": 1791877531414.5178,
+          "name": "Live music search check",
+          "preferences": []
+        }
+      ],
+      "playing": false,
+      "polls": [],
+      "position": 3.706139404296875,
+      "queue": [],
+      "settings": {
+        "autoAdvance": false,
+        "collaborative": false,
+        "mode": "listen"
+      },
+      "syncBarrier": {
+        "error": "Playback remains paused. Not ready: Live music search check. Enable playback or wait for loading, then retry.",
+        "hostId": "233f1019-a042-45fb-b5ce-a26cef03133a",
+        "id": "1579e808-fbfb-4bd1-8cdb-bc480f196600",
+        "mediaRevision": 1,
+        "participants": [
+          "233f1019-a042-45fb-b5ce-a26cef03133a"
+        ],
+        "position": 3.706139404296875,
+        "startedAt": 1791877537550.996,
+        "status": "failed"
+      },
+      "version": 9
+    }
+  },
+  "completedAt": "2026-10-13T07:45:56.204Z"
+}

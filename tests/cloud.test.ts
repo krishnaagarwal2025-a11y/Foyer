@@ -1,3 +1,4 @@
+import { catalog } from "../server/catalog";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   CloudCoordinator,
@@ -94,6 +95,7 @@ beforeEach(async () => {
   );
   const result = await a.join("host", { name: "Host" });
   code = result.room!.code;
+    store.records.get(code)!.room.media = catalog[0];
   identity = result.identity!;
   await b.join("guest", { name: "Guest", code });
 });

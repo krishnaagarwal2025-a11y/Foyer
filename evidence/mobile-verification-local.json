@@ -1,6 +1,6 @@
 {
-  "url": "http://localhost:3001",
-  "checkedAt": "2026-10-13T07:25:31.793Z",
+  "url": "http://127.0.0.1:3001",
+  "checkedAt": "2026-10-13T08:45:11.429Z",
   "passed": true,
   "layouts": [
     {

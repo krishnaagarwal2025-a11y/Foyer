@@ -1,3 +1,4 @@
+import { loadDemo } from "../tests/browser/demo";
 import { chromium, type Page } from "@playwright/test";
 import { performance } from "node:perf_hooks";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -117,6 +118,7 @@ try {
         ),
     );
     await button.click();
+    if (!code) await loadDemo(page);
     await page
       .getByRole("heading", { name: "Cinema Color Journey", level: 1 })
       .waitFor();

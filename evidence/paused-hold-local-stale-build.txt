@@ -1,0 +1,44 @@
+
+> foyer@2.0.0 test:browser
+> playwright test tests/browser/youtube.spec.ts
+
+
+Running 6 tests using 1 worker
+
+(node:18444) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x  1 tests\browser\youtube.spec.ts:153:1 › host sync holds the local pause while the authoritative pause crosses the network (3.0s)
+(node:2648) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 2 tests\browser\youtube.spec.ts:195:1 › concurrent room checks do not cancel an in-flight paused provider seek (4.1s)
+  ok 3 tests\browser\youtube.spec.ts:240:1 › slow phone playback is not labelled autoplay-blocked and automatic correction gives buffering time to settle (21.3s)
+  ok 4 tests\browser\youtube.spec.ts:298:1 › YouTube buffering settles, native host actions synchronize, retry rebuilds and Music links join Listen (25.1s)
+  ok 5 tests\browser\youtube.spec.ts:496:1 › changing songs with a cached YouTube SDK never blanks host or guest (6.1s)
+  ok 6 tests\browser\youtube.spec.ts:566:1 › in-app music search plays a selected result across the room without a new tab or copied link (3.8s)
+
+
+  1) tests\browser\youtube.spec.ts:153:1 › host sync holds the local pause while the authoritative pause crosses the network 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 1
+    Received: 2
+
+      180 |     await host.getByRole("button", { name: "Sync room" }).click();
+      181 |     await host.waitForTimeout(300);
+    > 182 |     expect((await fixtureState(host)).plays).toBe(before);
+          |                                              ^
+      183 |     expect((await fixtureState(host)).state).toBe(2);
+      184 |     await expect(host.locator("#sync-feedback")).toContainText(
+      185 |       "All 1 devices aligned",
+        at C:\projects\watch_party\tests\browser\youtube.spec.ts:182:46
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\youtube-host-sync-holds-th-e7d8d-e-pause-crosses-the-network\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\youtube-host-sync-holds-th-e7d8d-e-pause-crosses-the-network\error-context.md
+
+  1 failed
+    tests\browser\youtube.spec.ts:153:1 › host sync holds the local pause while the authoritative pause crosses the network 
+  5 passed (1.2m)

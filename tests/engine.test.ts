@@ -1,3 +1,4 @@
+import { catalog } from "../server/catalog";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Engine, type Saved } from "../server/engine";
 import { expectedPosition, correction, type Room } from "../shared/types";
@@ -36,6 +37,7 @@ beforeEach(() => {
   host = a.identity!.id;
   hostToken = a.identity!;
   guest = engine.join("b", { name: "Guest", code }).identity!.id;
+  engine.rooms.get(code)!.media = catalog[0];
 });
 describe("room protocol and permissions", () => {
   it("returns a fresh public sync snapshot to guests without mutating the room", () => {

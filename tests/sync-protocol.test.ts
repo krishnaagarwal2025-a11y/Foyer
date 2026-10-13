@@ -1,3 +1,4 @@
+import { catalog } from "../server/catalog";
 import { describe, it, expect } from "vitest";
 import { createServer } from "node:http";
 import { Server } from "socket.io";
@@ -125,6 +126,7 @@ describe("authoritative scheduled playback", () => {
     );
     const joined = engine.join("host", { name: "Host" }),
       room = joined.room!;
+    engine.rooms.get(room.code)!.media = catalog[0];
     engine.join("guest", { name: "Guest", code: room.code });
     const envelope = {
       opId: crypto.randomUUID(),

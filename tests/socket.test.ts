@@ -1,3 +1,4 @@
+import { catalog } from "../server/catalog";
 import { it, expect } from "vitest";
 import { createServer } from "node:http";
 import { Server } from "socket.io";
@@ -34,6 +35,7 @@ it("propagates real socket commands to ten clients and reconnects a stable ident
     const host = await connect(),
       joined = await emit(host, "join", { name: "Host" }),
       code = joined.room!.code;
+    engine.rooms.get(code)!.media = catalog[0];
     for (let i = 1; i < 10; i++)
       await emit(await connect(), "join", { name: `Guest ${i}`, code });
     const delivered = clients

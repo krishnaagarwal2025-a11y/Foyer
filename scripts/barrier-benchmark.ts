@@ -1,3 +1,4 @@
+import { loadDemo } from "../tests/browser/demo";
 import { chromium, type Page, type BrowserContext } from "@playwright/test";
 import { writeFileSync } from "node:fs";
 import os from "node:os";
@@ -85,6 +86,7 @@ try {
     await page
       .getByRole("button", { name: i ? "Join room →" : "＋ Create a room" })
       .click();
+    if (!i) await loadDemo(page);
     await page.locator("video").waitFor();
   }
   const host = pages[0];

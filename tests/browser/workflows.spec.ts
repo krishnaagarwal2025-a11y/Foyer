@@ -1,3 +1,4 @@
+import { loadDemo } from "./demo";
 import { test, expect, type Page } from "@playwright/test";
 async function enter(page: Page, name: string, code?: string) {
   await page.goto(code ? `/?room=${code}` : "/");
@@ -10,6 +11,7 @@ async function enter(page: Page, name: string, code?: string) {
   await page
     .getByRole("button", { name: code ? "Join room →" : "＋ Create a room" })
     .click();
+  if (!code) await loadDemo(page);
   await expect(
     page.getByRole("heading", { name: "Cinema Color Journey", level: 1 }),
   ).toBeVisible();

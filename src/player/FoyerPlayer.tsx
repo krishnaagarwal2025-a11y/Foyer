@@ -166,7 +166,7 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
           callbacks.current.onReady();
         }
       };
-      if (m.kind === "external") return;
+      if (m.kind === "external" || m.kind === "empty") return;
       if (["direct", "audius", "navidrome"].includes(p)) {
         const el = native.current!;
         adapter.current = el as PlaybackHandle;
@@ -480,7 +480,20 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
               return request;
             };
             pause = () => {
-              if (player.getPlayerState() === 2 || intendedState === 2) return;
+              // A paused seek can report SDK BUFFERING. Re-pausing for each
+              // concurrent timing packet cancels the seek before it settles.
+              // Still cancel a pending Play or genuinely playing/rebuffering.
+              const state = player.getPlayerState();
+              if (
+                !pendingPlay &&
+                (state === 2 ||
+                  (paused && state === 3 && seekTarget !== undefined))
+              )
+                return;
+              if (intendedState === 2) {
+                settlePlay();
+                return;
+              }
               intendedState = 2;
               commandUntil = performance.now() + 1500;
               settlePlay();
@@ -488,6 +501,9 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
             };
             seek = (t) => {
               nativeSeekPending = false;
+              // seekTo from CUED starts playback; establish an actual paused
+              // SDK state first when the authoritative room is paused.
+              if (paused && player.getPlayerState() !== 2) pause();
               seekTarget = t;
               seekDeadline = performance.now() + 3000;
               commandUntil = performance.now() + 1500;
@@ -653,6 +669,16 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
     }, [props.muted]);
     const m = props.media,
       p = m.provider || "direct";
+    if (m.kind === "empty")
+      return (
+        <div className="external-screen">
+          <span className="eyebrow">WATCH TOGETHER</span>
+          <h2>Your screen is ready</h2>
+          <p>
+            Add a video link or choose a playable title in Discover to begin.
+          </p>
+        </div>
+      );
     if (m.kind === "external")
       return (
         <div className="external-screen">

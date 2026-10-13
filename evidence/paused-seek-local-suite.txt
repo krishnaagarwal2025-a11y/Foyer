@@ -1,0 +1,16 @@
+
+> foyer@2.0.0 test:browser
+> playwright test tests/browser/youtube.spec.ts
+
+
+Running 5 tests using 1 worker
+
+(node:15436) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 tests\browser\youtube.spec.ts:153:1 › concurrent room checks do not cancel an in-flight paused provider seek (4.0s)
+  ok 2 tests\browser\youtube.spec.ts:198:1 › slow phone playback is not labelled autoplay-blocked and automatic correction gives buffering time to settle (21.1s)
+  ok 3 tests\browser\youtube.spec.ts:256:1 › YouTube buffering settles, native host actions synchronize, retry rebuilds and Music links join Listen (24.6s)
+  ok 4 tests\browser\youtube.spec.ts:454:1 › changing songs with a cached YouTube SDK never blanks host or guest (6.1s)
+  ok 5 tests\browser\youtube.spec.ts:524:1 › in-app music search plays a selected result across the room without a new tab or copied link (3.9s)
+
+  5 passed (1.1m)

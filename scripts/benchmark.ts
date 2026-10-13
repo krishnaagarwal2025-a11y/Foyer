@@ -56,6 +56,12 @@ try {
   }
   let room = host.room!;
   clients[0].on("state", (r: Room) => (room = r));
+  const selected = await emit(clients[0], "command", {
+    opId: crypto.randomUUID(),
+    mediaRevision: room.mediaRevision,
+    command: { type: "media", movieId: "local-demo" },
+  });
+  if (!selected.ok) throw Error(selected.error);
   await sleep(1000);
   for (let i = -9; i < iterations; i++) {
     const type = ["play", "pause", "seek"][(i + 9) % 3],

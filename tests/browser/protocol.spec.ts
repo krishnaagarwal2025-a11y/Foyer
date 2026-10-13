@@ -1,3 +1,4 @@
+import { loadDemo } from "./demo";
 import { test, expect, type Page } from "@playwright/test";
 const enter = async (page: Page, name: string, code?: string) => {
   await page.goto(code ? "/?room=" + code : "/");
@@ -7,6 +8,7 @@ const enter = async (page: Page, name: string, code?: string) => {
   });
   await expect(button).toBeEnabled();
   await button.click();
+  if (!code) await loadDemo(page);
   await expect(page.locator("video")).toBeVisible();
   return new URL(page.url()).searchParams.get("room")!;
 };

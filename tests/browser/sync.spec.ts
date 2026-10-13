@@ -1,3 +1,4 @@
+import { loadDemo } from "./demo";
 import { test, expect } from "@playwright/test";
 
 test("host sync pauses both players, waits for every device, aligns and automatically resumes; guests cannot invoke it", async ({
@@ -17,6 +18,7 @@ test("host sync pauses both players, waits for every device, aligns and automati
     await host.goto("/");
     await host.getByLabel("Display name").fill("Sync host");
     await host.getByRole("button", { name: "＋ Create a room" }).click();
+    await loadDemo(host);
     await expect(host.locator("video")).toBeVisible();
     const code = new URL(host.url()).searchParams.get("room");
     await guest.goto("/?room=" + code);
@@ -165,6 +167,7 @@ test("sync response timeout and offline state remain explicit", async ({
     await page.goto("/");
     await page.getByLabel("Display name").fill("Network check");
     await page.getByRole("button", { name: "＋ Create a room" }).click();
+    await loadDemo(page);
     await page.getByRole("button", { name: "Sync room" }).click();
     await expect(
       page.getByRole("button", { name: "Syncing…", exact: true }),
@@ -202,6 +205,7 @@ test("light and dark themes persist, use restrained controls and remain readable
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
     await page.getByLabel("Display name").fill("Theme check");
     await page.getByRole("button", { name: "＋ Create a room" }).click();
+    await loadDemo(page);
     await expect(page.locator("video")).toBeVisible();
     await expect(page.locator(".theme-toggle")).toHaveCSS(
       "border-radius",

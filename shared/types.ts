@@ -9,7 +9,7 @@ export type Movie = {
     | "netflix"
     | "prime"
     | "hotstar";
-  kind?: "video" | "audio" | "external";
+  kind?: "video" | "audio" | "external" | "empty";
   sourceId?: string;
   artist?: string;
   artwork?: string;

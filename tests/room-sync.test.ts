@@ -1,3 +1,4 @@
+import { catalog } from "../server/catalog";
 import { it, expect } from "vitest";
 import { Engine } from "../server/engine";
 import { expectedPosition, type Synchronization } from "../shared/types";
@@ -10,6 +11,7 @@ const setup = () => {
     () => now,
   );
   const r = e.join("host", { name: "Host" }).room!;
+  e.rooms.get(r.code)!.media = catalog[0];
   e.join("guest", { name: "Guest", code: r.code });
   const send = (sid: string, command: object, preparation?: any) =>
     e.apply(

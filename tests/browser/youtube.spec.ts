@@ -1,3 +1,4 @@
+import { loadDemo } from "./demo";
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { createApplication } from "../../server/app";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -15,6 +16,7 @@ async function installYouTube(context: BrowserContext) {
       deferredMethods: false,
       playDelayMs: 500,
       seekDelayMs: 200,
+      deferSeekPosition: false,
     });
     window.addEventListener("watchparty:command", (event) =>
       fixture.commands.push((event as CustomEvent).detail.command),
@@ -79,14 +81,19 @@ async function installYouTube(context: BrowserContext) {
         seekTo(time: number) {
           this.seeks++;
           const resume = this.state === 1;
-          this.position = time;
-          this.anchor = performance.now();
+          if (!fixture.deferSeekPosition) {
+            this.position = time;
+            this.anchor = performance.now();
+          }
           this.emit(3);
           clearTimeout(this.timer);
-          this.timer = setTimeout(
-            () => this.emit(resume ? 1 : 2),
-            fixture.seekDelayMs,
-          );
+          this.timer = setTimeout(() => {
+            if (fixture.deferSeekPosition) {
+              this.position = time;
+              this.anchor = performance.now();
+            }
+            this.emit(resume ? 1 : 2);
+          }, fixture.seekDelayMs);
         }
         getCurrentTime() {
           return (
@@ -123,6 +130,7 @@ async function enter(page: Page, name: string, code?: string) {
   await page
     .getByRole("button", { name: code ? "Join room →" : "＋ Create a room" })
     .click();
+  if (!code) await loadDemo(page);
   await expect(
     page.getByRole("heading", { name: "Cinema Color Journey", level: 1 }),
   ).toBeVisible();
@@ -143,6 +151,93 @@ const fixtureState = (page: Page) =>
       ),
     };
   });
+
+test("host sync holds the local pause while the authoritative pause crosses the network", async ({
+  browser,
+}) => {
+  const context = await browser.newContext();
+  await installYouTube(context);
+  await context.routeWebSocket("**/socket.io/**", (socket) => {
+    const server = socket.connectToServer();
+    socket.onMessage((message) => {
+      if (String(message).includes('["sync",'))
+        setTimeout(() => server.send(message), 500);
+      else server.send(message);
+    });
+    server.onMessage((message) => socket.send(message));
+  });
+  const host = await context.newPage();
+  try {
+    await enter(host, "Pause hold host");
+    await host.locator(".source-panel > summary").click();
+    await host.getByLabel("Custom media title").fill("Pause hold fixture");
+    await host
+      .getByLabel("Custom media URL")
+      .fill("https://www.youtube.com/watch?v=abcdefghijk");
+    await host.getByRole("button", { name: "Load video", exact: true }).click();
+    await expect(host.getByTitle("YouTube API fixture")).toBeVisible();
+    await host.getByRole("button", { name: "Play", exact: true }).click();
+    await expect.poll(async () => (await fixtureState(host)).state).toBe(1);
+    const before = (await fixtureState(host)).plays;
+    await host.getByRole("button", { name: "Sync room" }).click();
+    await host.waitForTimeout(300);
+    expect((await fixtureState(host)).plays).toBe(before);
+    expect((await fixtureState(host)).state).toBe(2);
+    await expect(host.locator("#sync-feedback")).toContainText(
+      "All 1 devices aligned",
+      { timeout: 18000 },
+    );
+    await expect.poll(async () => (await fixtureState(host)).state).toBe(1);
+    expect((await fixtureState(host)).plays).toBe(before + 1);
+  } finally {
+    await context.close();
+  }
+});
+
+test("concurrent room checks do not cancel an in-flight paused provider seek", async ({
+  browser,
+}) => {
+  const a = await browser.newContext(),
+    b = await browser.newContext();
+  for (const context of [a, b]) {
+    await installYouTube(context);
+    await context.addInitScript(() => {
+      (window as any).youtubeFixture.deferSeekPosition = true;
+      (window as any).youtubeFixture.seekDelayMs = 600;
+    });
+  }
+  const host = await a.newPage(),
+    guest = await b.newPage();
+  try {
+    const code = await enter(host, "Paused-seek host");
+    await enter(guest, "Paused-seek guest", code);
+    await host.locator(".source-panel > summary").click();
+    await host.getByLabel("Custom media title").fill("Deferred paused seek");
+    await host
+      .getByLabel("Custom media URL")
+      .fill("https://www.youtube.com/watch?v=abcdefghijk");
+    await host.getByRole("button", { name: "Load video", exact: true }).click();
+    for (const page of [host, guest])
+      await expect(page.getByTitle("YouTube API fixture")).toBeVisible();
+    await guest.evaluate(() => {
+      const player = (window as any).youtubeFixture.instances.at(-1);
+      player.position = 5;
+      player.anchor = performance.now();
+      player.emit(2);
+    });
+    await host.getByRole("button", { name: "Sync room" }).click();
+    await expect(host.locator("#sync-feedback")).toContainText(
+      "All 2 devices aligned",
+      { timeout: 18000 },
+    );
+    for (const page of [host, guest])
+      await expect.poll(async () => (await fixtureState(page)).state).toBe(1);
+    expect((await fixtureState(guest)).commands).toEqual([]);
+  } finally {
+    await a.close();
+    await b.close();
+  }
+});
 
 test("slow phone playback is not labelled autoplay-blocked and automatic correction gives buffering time to settle", async ({
   browser,
@@ -205,6 +300,7 @@ test("slow phone playback is not labelled autoplay-blocked and automatic correct
 test("YouTube buffering settles, native host actions synchronize, retry rebuilds and Music links join Listen", async ({
   browser,
 }) => {
+  test.setTimeout(90000);
   const a = await browser.newContext(),
     b = await browser.newContext();
   await installYouTube(a);
@@ -510,6 +606,7 @@ test("in-app music search plays a selected result across the room without a new 
     await host.goto(base);
     await host.getByLabel("Display name").fill("Search host");
     await host.getByRole("button", { name: "＋ Create a room" }).click();
+    await loadDemo(host);
     await expect(host.locator("video")).toBeVisible();
     const code = new URL(host.url()).searchParams.get("room")!;
     await guest.goto(base + "/?room=" + code);

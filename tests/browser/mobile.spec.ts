@@ -1,3 +1,4 @@
+import { loadDemo } from "./demo";
 import { test, expect, type Page } from "@playwright/test";
 import { writeFileSync } from "node:fs";
 
@@ -45,6 +46,7 @@ test("phone layouts fit at 320–430px and landscape while songs, sync and chat 
     await page
       .getByRole("button", { name: code ? "Join room →" : "＋ Create a room" })
       .click();
+    if (!code) await loadDemo(page);
     await expect(
       page.getByRole("heading", { name: "Cinema Color Journey", level: 1 }),
     ).toBeVisible();

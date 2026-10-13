@@ -1,77 +1,77 @@
 {
-  "checkedAt": "2026-10-13T07:26:09.801Z",
-  "url": "http://localhost:3001",
+  "checkedAt": "2026-10-13T08:45:49.409Z",
+  "url": "http://127.0.0.1:3001",
   "passed": true,
   "readings": [
     {
-      "position": 3.441622,
+      "position": 3.055436,
       "paused": false,
       "readyState": 4,
       "waitingEvents": 0,
-      "absoluteDriftMs": 29.11896679687498
+      "absoluteDriftMs": 45.376744140625206
     },
     {
-      "position": 3.140983,
+      "position": 3.111315,
       "paused": false,
       "readyState": 4,
       "waitingEvents": 0,
-      "absoluteDriftMs": 341.84561328124994
+      "absoluteDriftMs": 18.728701171875084
     },
     {
-      "position": 5.47773,
+      "position": 5.088279,
       "paused": false,
       "readyState": 4,
       "waitingEvents": 0,
-      "absoluteDriftMs": 31.310771484374555
+      "absoluteDriftMs": 51.43389062499981
     },
     {
-      "position": 5.264627,
+      "position": 5.139992,
       "paused": false,
       "readyState": 4,
       "waitingEvents": 0,
-      "absoluteDriftMs": 253.3014667968754
+      "absoluteDriftMs": 22.751652343750095
     },
     {
-      "position": 7.502533,
+      "position": 7.102233,
       "paused": false,
       "readyState": 4,
       "waitingEvents": 0,
-      "absoluteDriftMs": 19.44698046875004
+      "absoluteDriftMs": 29.975496093750387
     },
     {
-      "position": 7.373815,
+      "position": 7.151664,
       "paused": false,
       "readyState": 4,
       "waitingEvents": 0,
-      "absoluteDriftMs": 177.2135644531252
+      "absoluteDriftMs": 31.279847656249693
     },
     {
-      "position": 9.531909,
+      "position": 9.137669,
       "paused": false,
       "readyState": 4,
       "waitingEvents": 0,
-      "absoluteDriftMs": 25.570980468749838
+      "absoluteDriftMs": 13.839544921873781
     },
     {
-      "position": 9.460946,
+      "position": 9.164042,
       "paused": false,
       "readyState": 4,
       "waitingEvents": 0,
-      "absoluteDriftMs": 126.28251562500026
+      "absoluteDriftMs": 37.0651777343749
     },
     {
-      "position": 11.568001,
+      "position": 11.153287,
       "paused": false,
       "readyState": 4,
       "waitingEvents": 0,
-      "absoluteDriftMs": 6.815650390624484
+      "absoluteDriftMs": 36.43199414062437
     },
     {
-      "position": 11.509616,
+      "position": 11.203399,
       "paused": false,
       "readyState": 4,
       "waitingEvents": 0,
-      "absoluteDriftMs": 99.81246679687494
+      "absoluteDriftMs": 20.70817773437561
     }
   ],
   "pageErrors": [],

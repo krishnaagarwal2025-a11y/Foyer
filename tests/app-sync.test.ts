@@ -1,3 +1,4 @@
+import { catalog } from "../server/catalog";
 import { it, expect, vi } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -81,6 +82,7 @@ it("the actual application enforces host sync, pauses ten socket peers, waits fo
     const host = await connect(),
       joined = await emit(host, "join", { name: "Host" }),
       code = joined.room!.code;
+  app.engine.rooms.get(code)!.media = catalog[0];
     for (let i = 1; i < 10; i++)
       await emit(await connect(), "join", { name: `Viewer ${i}`, code });
     const guest = clients[1];
