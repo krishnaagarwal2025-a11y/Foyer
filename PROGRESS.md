@@ -173,3 +173,5 @@ Scope: browser/phone emulation can reproduce Foyer-induced repeated seeks and fa
 
 ## Listening room vinyl
 - Replace native audio square with a circular grooved vinyl disc and clipped song-artwork center. Entire disc/artwork rotates with actual playing events and pauses on pause, waiting, ended or error; reduced motion disables spin. No-thumbnail tracks show a music label. Verified mobile native AAC playback with injected artwork metadata (presentation fixture, not a provider availability claim). Build passed; slow-network regression underway.
+
+- Listening-disc runtime b4d1f85 deployed as dpl_B9vpsBvDyCZ85mHGx1JN1txQj9NU. Live browser regression passes: rotating clipped artwork, pause preserves angle, reduced-motion disables rotation. Local slow-HTTP audio regression passes too (2/2 combined). Public health200; evidence saved.
