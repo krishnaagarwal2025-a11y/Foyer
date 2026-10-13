@@ -186,3 +186,4 @@ Scope: browser/phone emulation can reproduce Foyer-induced repeated seeks and fa
 
 ## YouTube Listen artwork layout
 - User clarified YouTube Music needs the disc too. Add primary rotating thumbnail disc beside an intact visible official player in Listen mode. Watch layout preserved; phone stacks both. Provider rotation follows actual adapter paused/readiness. Official minimum visible size200x200 documented at https://developers.google.com/youtube/player_parameters. Build and provider regression next.
+- YouTube Listen runtime07ce679 deployed as dpl_85VpWzmh9q4yUDArJzgrBJHXs55d. Build and7 targeted browser checks pass (controlled SDK playback fixtures). Live Ek Tarfa search selected a song: real thumbnail loaded inside the circle, separate official iframe visible >=200x200, screenshot inspected. This live smoke validates layout/artwork, not a new timing/availability benchmark.
