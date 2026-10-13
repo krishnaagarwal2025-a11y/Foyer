@@ -108,3 +108,5 @@ New Watch rooms use `emptyWatch` in server/catalog.ts; server/engine.ts rejects 
 
 ## Theme and motion polish
 Purple theme hierarchy, light-mode poster illustration, real request-driven rolling-disc loader (`src/DiscLoader.tsx`), navigation transitions and reduced-motion support are verified in `tests/browser/visual-polish.spec.ts`. Phone/desktop snapshots are stored as `evidence/purple-*.png`; the loader also clears after failed invitations. Playback stays mounted during room-tool navigation.
+
+Native listening-player artwork: circular vinyl with thumbnail center spins on actual HTML5 playing events, pauses during buffering/paused/ended/error, and respects reduced motion. Verified in tests/browser/listening-disc.spec.ts with actual AAC playback and injected thumbnail metadata. Provider-owned iframe UI remains provider-controlled.

@@ -815,3 +815,73 @@ details,
     transition: none;
   }
 }
+
+.record-art.listening-disc {
+  border-radius: 50%;
+  position: relative;
+  display: grid;
+  place-items: center;
+  background: repeating-radial-gradient(
+    circle,
+    #19161e 0 2px,
+    #34303c 3px,
+    #19161e 4px 6px
+  );
+  border: 1px solid #54505c;
+  box-shadow: 0 8px 24px #0002;
+  animation: disc-roll 12s linear infinite;
+  animation-play-state: paused;
+}
+.record-art.listening-disc.is-playing {
+  animation-play-state: running;
+}
+.listening-disc::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 20deg,
+    transparent 0deg,
+    #ffffff24 45deg,
+    transparent 80deg 180deg,
+    #ffffff18 225deg,
+    transparent 270deg
+  );
+  pointer-events: none;
+}
+.listening-disc-label {
+  width: 48%;
+  height: 48%;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  z-index: 1;
+  position: relative;
+}
+.record-art .listening-disc-label img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+.record-art .listening-disc-label span {
+  color: var(--accent-text);
+  font-size: 28px;
+}
+.listening-disc-label::after {
+  content: "";
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #19161e;
+  border: 1px solid #ffffff60;
+}
+@media (prefers-reduced-motion: reduce) {
+  .record-art.listening-disc {
+    animation: none;
+  }
+}

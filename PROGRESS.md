@@ -170,3 +170,6 @@ Scope: browser/phone emulation can reproduce Foyer-induced repeated seeks and fa
 - Build/type checks and 60 unit/integration tests pass. Desktop/phone theme and disc/navigation checks pass. Existing three multi-client workflows pass. Initial connection overlay exposed a focus race in the automated join test; render the connection loader before the form mounts, then rerun passes (2/2). Retained earlier failed attempt. Screenshots visually inspected; publish and public verification next.
 
 - Purple/motion runtime 7ed4ed9 deployed as dpl_BvHnHaa6RL7ssNX3H7gJNrKVSuPM to https://foyer-cyan.vercel.app. Public visual/loading/empty-Watch checks pass 3/3; screenshots inspected for light/dark desktop and phone plus disc. Health200, local demo remains running. Final evidence saved in evidence/purple-vercel-tests.txt.
+
+## Listening room vinyl
+- Replace native audio square with a circular grooved vinyl disc and clipped song-artwork center. Entire disc/artwork rotates with actual playing events and pauses on pause, waiting, ended or error; reduced motion disables spin. No-thumbnail tracks show a music label. Verified mobile native AAC playback with injected artwork metadata (presentation fixture, not a provider availability claim). Build passed; slow-network regression underway.

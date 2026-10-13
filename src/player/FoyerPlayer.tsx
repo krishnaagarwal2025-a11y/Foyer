@@ -4,6 +4,7 @@ import React, {
   useImperativeHandle,
   useMemo,
   useRef,
+  useState,
 } from "react";
 import type { Movie } from "../../shared/types";
 import { ProviderRecovery } from "./ProviderRecovery";
@@ -108,6 +109,7 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
       adapter = useRef<PlaybackHandle | null>(null),
       failed = useRef(false),
       callbacks = useRef(props);
+    const [discPlaying, setDiscPlaying] = useState(false);
     callbacks.current = props;
     const proxy = useMemo(
       () =>
@@ -750,14 +752,21 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
         if (!failed.current) callbacks.current.onReady();
       },
       onPlaying: () => {
+        setDiscPlaying(true);
         if (!failed.current) callbacks.current.onPlaying();
       },
       onSeeked: () => callbacks.current.onSeeked(),
-      onEnded: () => callbacks.current.onEnded(),
+      onPause: () => setDiscPlaying(false),
+      onEnded: () => {
+        setDiscPlaying(false);
+        callbacks.current.onEnded();
+      },
       onWaiting: () => {
+        setDiscPlaying(false);
         if (!failed.current) callbacks.current.onWaiting();
       },
       onError: () => {
+        setDiscPlaying(false);
         failed.current = true;
         callbacks.current.onError(
           "This source cannot be played. Check its codec, availability and browser permissions. The host can select the local demo.",
@@ -768,14 +777,23 @@ export const FoyerPlayer = forwardRef<PlaybackHandle, Props>(
       return (
         <div className="audio-screen">
           <div
-            className="record-art"
+            className={`record-art listening-disc ${discPlaying ? "is-playing" : ""}`}
             style={{ "--movie-color": m.color } as React.CSSProperties}
           >
-            {m.artwork ? (
-              <img src={m.artwork} alt="" referrerPolicy="no-referrer" />
-            ) : (
-              <span>♪</span>
-            )}
+            <div className="listening-disc-label">
+              {m.artwork ? (
+                <img
+                  src={m.artwork}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+              ) : (
+                <span>♪</span>
+              )}
+            </div>
           </div>
           <h2>{m.title}</h2>
           <p>{m.artist || "A listening room for your people"}</p>
