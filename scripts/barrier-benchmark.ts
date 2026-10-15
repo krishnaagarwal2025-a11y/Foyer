@@ -1,7 +1,8 @@
 import { loadDemo } from "../tests/browser/demo";
 import { chromium, type Page, type BrowserContext } from "@playwright/test";
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import os from "node:os";
+mkdirSync("evidence", { recursive: true });
 const url = process.env.DEMO_URL || "http://localhost:3001",
   count = Number(process.env.BENCH_CLIENTS || 10),
   rounds = Number(process.env.SYNC_ROUNDS || 5);
@@ -45,7 +46,13 @@ const browser = await chromium.launch({
     "--autoplay-policy=no-user-gesture-required",
     "--disable-background-timer-throttling",
     "--disable-renderer-backgrounding",
-    ...(process.env.LOW_MEMORY === "1" ? ["--disable-gpu", "--renderer-process-limit=2", "--js-flags=--max-old-space-size=64 --max-semi-space-size=1"] : []),
+    ...(process.env.LOW_MEMORY === "1"
+      ? [
+          "--disable-gpu",
+          "--renderer-process-limit=2",
+          "--js-flags=--max-old-space-size=64 --max-semi-space-size=1",
+        ]
+      : []),
   ],
 });
 const contexts: BrowserContext[] = [],

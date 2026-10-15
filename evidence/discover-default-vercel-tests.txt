@@ -1,7 +1,0 @@
-
-Running 2 tests using 1 worker
-
-  ok 1 tests\browser\empty-watch.spec.ts:3:1 › Watch starts empty and an optional video can be selected (4.1s)
-  ok 2 tests\browser\sidebar-default.spec.ts:2:1 › Discover opens first and queue remove stays a functional square on phones (2.8s)
-
-  2 passed (9.0s)

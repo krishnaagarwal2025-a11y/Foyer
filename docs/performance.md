@@ -1,0 +1,200 @@
+# Measured performance
+
+Selected reports are in [benchmarks/](benchmarks/README.md). Other artifacts referenced below remain in [Git history](https://github.com/krishnaagarwal2025-a11y/Foyer/tree/3dd9fec/evidence). These are dated experiments, not new measurements for the latest UI.
+
+Historical baseline: **12 October 2026, Asia/Calcutta**. Current theme/host-sync measurements dated **13 October** appear at the end. Raw JSON retains UTC timestamps. The first table records **localhost/loopback on one machine**. Separate public Vercel runs are recorded below; none is a physical LAN test.
+
+| Measurement | Samples | p50 | p95 | Maximum |
+|---|---:|---:|---:|---:|
+| Ten socket clients: control delivery | 810 | 5.27 ms | **6.95 ms** | 10.35 ms |
+| Ten isolated browsers: control event delivery | 270 | 7.44 ms | **10.53 ms** | 14.24 ms |
+| Ten isolated browsers: player state application | 270 | 27.04 ms | **122.44 ms** | 129.74 ms |
+| Ten isolated browsers: absolute playback drift after correction | 300 | 42.58 ms | **65.50 ms** | 74.53 ms |
+
+The final run met the ≤250 ms p95 **control delivery** target and the ≤500 ms **corrected drift** target under these conditions. Player-state application also measured below 250 ms p95. This does **not** establish performance on a real LAN, arbitrary media, mobile devices, other browsers or video frame presentation timestamps.
+
+## Conditions
+
+- Windows NT 10.0.26200; Node v24.15.0; AMD Ryzen 5 5500U; 12 logical CPUs; 15.34 GiB reported total memory.
+- Compiled Vite frontend and Express/Socket.IO/SQLite server served from `http://127.0.0.1:3001`; one server process, SQLite WAL, real persistence before room broadcast.
+- Chromium 156.0.8078.4, headless, **ten separate isolated browser contexts** and ten actual participants in one room. Final normal-mode run used the full room UI, not cinema-only rendering.
+- Local generated **90-second 320×180, 15 fps H.264/AAC** MP4, approximately 3 MiB. Keyframe interval: 15 frames (one second); fast-start MP4. No external media host or DRM.
+- Exact final media size: 3,168,063 bytes. SHA-256: `5348e60191423e7989f88c0288ea4cc201945fa29f5091f123937ce371256b2a`.
+- Browser autoplay explicitly enabled by `--autoplay-policy=no-user-gesture-required`; video elements muted. Background timer/render throttling disabled by the flags listed in the raw report. Browser policy in an ordinary interactive browser may differ.
+- No artificial network delay/loss or bandwidth throttling. Other desktop applications were present; actual CPU utilization was not recorded. Windows `os.loadavg()` returns zeros and must not be interpreted as an idle CPU. Final browser report recorded 4.28 GiB free physical memory at completion.
+
+## Method
+
+`npm run benchmark` creates ten real Socket.IO WebSocket connections. After one second and nine warm-up controls, it sends 90 controls (30 play, 30 pause, 30 seek), roughly 70 ms apart. Start is measured on the controller before recipient listener registration and host emission; end is each of the nine recipients' complete state callbacks. Listener setup overhead is included. Both timestamps use **the same Node monotonic clock**, so no cross-machine wall-clock subtraction occurs. 90 × 9 = 810 samples. This measures transport/state propagation, **not video playback**.
+
+`npm run benchmark:browser` creates ten isolated browser contexts, loads the real React application and real HTML5 media, joins a room through its UI, and sends 30 controls after six warm-ups. Each page's monotonic clock is calibrated to the controller's monotonic clock using the midpoint of the fastest of seven Playwright evaluations. The final calibration RTT maximum was **2.19 ms**, giving an approximate midpoint uncertainty of 1.10 ms; network asymmetry is still a limitation.
+
+- **Start:** the host application's actual command-dispatch event, before its socket emit.
+- **Delivery end:** the recipient's actual Socket.IO state handler for the corresponding operation ID.
+- **Application end:** the first player sample for that operation with sufficient data, no pending seek, the correct playing/paused state, a state version at least as new as that operation, and a timeline within 500 ms of expected. Observations run immediately on state and player readiness events and every 100 ms. This is a player-state criterion, not a measured display-frame timestamp.
+- **Drift:** independent sampling of actual `HTMLVideoElement.currentTime` for every participant at least one second after each command, compared with the authoritative anchor plus elapsed estimated server time. The application clock offset comes from its own repeated-ping estimator via read-only telemetry. This yields 30 × 10 = 300 samples. Measurements are point samples after correction, not a claim that transient seek drift always stays below 500 ms.
+
+Delivery and application exclude the sender: 30 × 9 = **270 samples each**, with **zero missing samples and zero recorded failures**. Quantiles use nearest rank on sorted samples. Small negative calibrated time differences would be clamped to zero; the reported distributions are comfortably above the calibration uncertainty.
+
+| Browser control | Recipient samples | Delivery p95 | Application p95 |
+|---|---:|---:|---:|
+| Play | 90 | 13.98 ms | 33.24 ms |
+| Pause | 90 | 10.84 ms | 127.43 ms |
+| Seek | 90 | 8.82 ms | 41.84 ms |
+
+The browser test suite separately verifies playing late joins, offline reconnect/resync, correction after deliberately setting a player's currentTime to zero, and recovery after a missing media source. Autoplay failure handling is tested by injecting a rejected play promise and restoring normal play on the user gesture; this verifies the recovery path, not every browser's real autoplay policy. The third-party players and streaming adapters are excluded from these performance figures: provider buffering, iframe event timing and platform policies need their own measurements.
+
+## Reproduce
+
+Start the compiled demo:
+
+```sh
+npm ci
+npm run build
+npm start
+```
+
+In another terminal:
+
+```sh
+npx playwright install chromium
+npm run benchmark
+npm run benchmark:browser
+```
+
+Outputs: `https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/socket-benchmark.json` and `https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/browser-benchmark.json`. Defaults: 10 clients, 90 socket commands, 30 browser commands. Environment overrides: `BENCH_URL`, `DEMO_URL`, `BENCH_CLIENTS`, `BENCH_COMMANDS`, `BROWSER_COMMANDS`. A low-memory fallback is available through `LOW_MEMORY=1`; it uses separate tabs/session identities in a shared context and cinema layout. Its report must not be described as isolated-context testing.
+
+For a real LAN repetition, run the production server on machine A and the benchmark controller on machine B on the same network. On B, in PowerShell:
+
+```powershell
+$env:BENCH_URL='http://SERVER_LAN_IP:3001'
+$env:DEMO_URL='http://SERVER_LAN_IP:3001'
+npm run benchmark
+npm run benchmark:browser
+```
+
+Record the actual network medium, server/client specifications, competing traffic, browser policies, media, and new results. This uses ten contexts on machine B; ten separate physical viewer devices require additional instrumentation/clock calibration and are not claimed by this script.
+
+## Failures, improvements and evidence
+
+Early concurrent checks and ten isolated contexts exceeded the Windows commit budget despite free physical RAM. This project's watchers were stopped; checks were serialized, Node benchmark heap/semi-space were bounded, and an explicit shared-context fallback was added. That completed fallback report is retained in `https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/browser-benchmark-shared-context.json` (22.33 ms delivery p95, 64.53 ms application p95, 103.22 ms max drift). The machine later had enough commit available for the final ten-isolated-context run.
+
+Initial reports had incomplete application samples because diagnostics replaced the latest operation marker; the recorder now retains the pending playback operation and requires the appropriate version. Earlier complete runs also measured application p95 around 531–585 ms. The final implementation uses readiness-triggered checks, a cached-source readiness reconciliation, 100 ms fallback correction, a one-second-keyframe local clip and direct read-only clock telemetry. Machine memory conditions improved as well, so gains cannot be attributed to one change alone. Earlier JSON reports are retained with explanatory names and are not the final evidence.
+
+Disconnection grace is 15 seconds; host replacement is deterministic after expiry. Reconnect restores complete authoritative state. Commands are not queued offline; timed-out commands retry once with the same operation ID when connected. Buffering/autoplay/source failures show recovery feedback. See README for full failure handling, resource bounds, and the limited deduplication window.
+
+## Provider playback follow-up
+
+The YouTube repair was verified separately on 12 October 2026: `npm run providers:youtube` loaded and played the official API demo (`M7lc1UVf-VE`), observed 38 matching player-state samples and progression to 5.1 seconds, and retained no error/buffering feedback. `https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/youtube-live.json` and its screenshot preserve the actual result. The embedded HTML5 video was also observed playing at readyState 4, with decoded size 854×480 and rendered size 808×454. This one-page smoke check used autoplay-enabled Chromium and does not certify every video, account, network, player or multi-user YouTube timing. Four automated browser workflows passed, including a two-context asynchronous YouTube API fixture. The ten-user figures above were refreshed after the playback correction changes using the local MP4; third-party playback remains excluded from those numbers.
+
+## Public Vercel verification
+
+URL: https://foyer-cyan.vercel.app. Ten clients ran on the Windows machine above, connecting over the Internet to the Mumbai function and free Mumbai Upstash database. This is not a physical LAN test. All four browser workflow tests passed against this URL; 44 unit tests pass. Real Redis coordination was separately verified with two explicitly separate local backend processes; public Vercel instance placement cannot be observed by this test.
+
+| Measurement | Samples | p50 | p95 | Maximum |
+|---|---:|---:|---:|---:|
+| Ten socket clients: control delivery | 810 | 78.29 ms | 105.55 ms | 241.17 ms |
+| Ten isolated browser contexts: event delivery | 270 | 49.10 ms | 70.79 ms | 106.60 ms |
+| Ten isolated browser contexts: player application | 270 | 67.19 ms | 170.95 ms | 182.49 ms |
+| Ten isolated browser contexts: corrected drift | 300 | 60.08 ms | 107.46 ms | 126.65 ms |
+
+Raw evidence: `https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/vercel-socket-benchmark.json`, `https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/vercel-browser-benchmark.json`, `https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/vercel-check.json`, `https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/cloud-check.json`. No missing browser samples or workflow failures were recorded. Video playback used the included demo MP4 served by Vercel; browser autoplay was allowed and audio muted. Browser throttling was disabled. Clock calibration maximum RTT was 2.70 ms. Windows memory pressure was present during the run; unrelated tool launches exhausted commit memory, but all ten contexts completed and reported actual samples. Windows load average is not a CPU measurement. These results do not establish all-device or third-party-media performance, or verify natural 300-second function rotation. Explicit reconnect and cross-process identity recovery were tested; expired-worker lease/election behavior is covered by cloud unit tests.
+
+Repeat using BENCH_URL or DEMO_URL set to the production URL, with BENCH_REPORT selecting a separate evidence file. The deployment is described in deployment.md.
+
+## Sync and layout review measurements
+
+After the manual-sync fix and sidebar reorganization, all **46 unit tests** and **six local browser workflows** pass. Extension packaging, TypeScript checks and the production build pass. Live YouTube API-demo playback reached 5.24 seconds with readyState 4 (actual provider video, not the fixture); see `https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/sync-review-youtube.json`. Provider availability varies by title/account/browser.
+
+The ten-client localhost socket run (`https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/sync-review-local-socket.json`) collected 810 deliveries after nine warm-up controls: p50 **5.35 ms**, p95 **6.79 ms**, maximum **12.79 ms**. This is socket delivery only. Public browser measurements for this revised version are recorded separately after deployment.
+
+## Device-check protocol performance
+
+The handshake-enabled localhost run used 10 isolated Chromium contexts, three acknowledgement exchanges per participant before each Play, the included video, muted audio and permitted autoplay. Background throttling was disabled. All measured controls and 300 drift samples completed without missing data. Intentional common-start waiting is included in player application timing. Conditions otherwise match the machine and clock-calibration methodology above.
+
+| Measurement | Samples | p50 | p95 | Maximum |
+|---|---:|---:|---:|---:|
+| Socket-only delivery including play preflight | 810 | 5.89 ms | 23.46 ms | 39.10 ms |
+| Browser event delivery including play preflight | 270 | 10.99 ms | 54.38 ms | 70.02 ms |
+| Browser player application, including scheduled wait | 270 | 123.89 ms | 171.84 ms | 268.59 ms |
+| Corrected absolute drift | 300 | 34.56 ms | 90.10 ms | 151.65 ms |
+
+Raw reports: `https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/protocol-local-socket.json` and `https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/protocol-local-browser.json`. RTT-based offset assumes symmetric routes; it is an estimate. Loopback is not a physical LAN test. Real Redis coordination was separately verified with two backend processes; that report is protocol-only and uses synthetic readiness. See architecture.md for the bounded missing-device policy and scheduled-anchor algorithm. Public deployment results are kept in separate reports.
+
+The initial sequential public handshake missed the delivery target: socket p95 396.15 ms and browser p95 407.50 ms. Drift remained below 170 ms maximum. Those failed delivery runs are preserved as `protocol-vercel-sequential-socket.json` and `protocol-vercel-sequential-browser.json`. The final protocol issues the three timestamped exchanges concurrently to avoid accumulating three network waits. The local table above is the optimized rerun; public optimized results are recorded separately. Source readiness is reported by the client/player API; the server measures RTT and validates membership. Provider-native buffering may begin on playback even after API readiness.
+
+## Final optimized public protocol run
+
+URL: https://foyer-cyan.vercel.app. Ten isolated Chromium contexts on the documented Windows machine connected over the Internet to the Vercel/Redis deployment. All seven public browser workflows passed; the final keyboard-disclosure and unavailable-YouTube-source regressions also passed locally. The source-unavailable case checks device delay and reports failure instead of claiming successful playback. Real public YouTube playback/manual sync succeeded separately. The extension package check passed, but its Windows browser fixture was skipped for the missing runtime; signed-in subscription playback remains unverified.
+
+| Measurement | Samples | p50 | p95 | Maximum |
+|---|---:|---:|---:|---:|
+| Public socket delivery, including concurrent preflight | 810 | 84.52 ms | 195.97 ms | 416.19 ms |
+| Public browser event delivery, including concurrent preflight | 270 | 59.67 ms | 208.89 ms | 235.64 ms |
+| Public player application, including common-start wait | 270 | 159.87 ms | 334.47 ms | 384.47 ms |
+| Public corrected absolute drift | 300 | 22.08 ms | 64.31 ms | 167.12 ms |
+
+The delivery and corrected-drift targets passed. Player application includes the intentionally scheduled waiting period and did not meet 250 ms p95 on this Internet run; event propagation is a separate metric. All expected samples arrived, no playback failures were reported, and browser clock-calibration maximum RTT was 3.03 ms. Autoplay was allowed, audio muted and background throttling disabled. This is one-machine Internet testing, not a physical LAN or a guarantee for every device/media source. Raw final reports: `https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/protocol-vercel-socket.json`, `https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/protocol-vercel-browser.json`, `https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/protocol-vercel-check.json`, and `https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/protocol-vercel-youtube.json`. Sequential failed-delivery reports are retained for comparison.
+
+## Song-switch and phone functional verification (2026-10-12)
+
+These are functional checks, not new latency benchmarks. Before the fix, a real public YouTube player played the first revision and the second revision crashed the page with `unMute is not a function` (`https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/song-switch-vercel-before.json`). The cached SDK exposes volume methods only once its new iframe is ready; volume preferences now wait for readiness and old callbacks are ignored.
+
+The local live-provider report (`https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/song-switch-local.json`) records four successful playing sources: two YouTube revisions, local audio, and YouTube again, followed by confirmed manual sync. YouTube frames decoded at 854×480; every source had readyState 4; no uncaught errors occurred. The same public API demo is reused under different revisions rather than claiming four distinct licensed songs.
+
+Two isolated mobile/touch-emulated Chromium contexts also exercise actual audio changes, playback, guest manual sync and chat. Seventeen layout checks cover Room/Discover/People/source entry at 320, 360, 390 and 430px and an 844px landscape viewport, without document overflow. Screenshots were visually inspected. Physical phones, Safari and realistic mobile network throttling are not covered. The prior ten-client delivery/drift measurements above are unchanged and are not relabeled as mobile benchmarks.
+
+Final public runtime `f956ff7` also passes the real provider switch check (`https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/song-switch-vercel-after.json`): all four sources are playing with readyState 4, YouTube decodes at 854×480, manual sync is confirmed, and there are no uncaught errors. The initial post-fix probe (`song-switch-vercel-stale-indicator.json`) sampled the audio element too early using a carried-over slider value; the indicator now resets on source change and the probe waits on actual media progress. The public phone workflow initially exceeded its 5s initial-media assertion while both sources remained networkState 2 (loading), with no media error; response diagnostics confirmed valid 206 audio/wave delivery. It passed in 17.3s overall after allowing 20s for initial Internet media loading. That loading allowance is distinct from control propagation or corrected drift. All nine public workflows were verified, with this targeted retry following the eight passes in the full run.
+
+## Host-only pause / handshake / resume (2026-10-13)
+
+`npm run benchmark:sync` runs ten isolated Chromium contexts, five manual-sync trials on bundled video and five on bundled audio, following a decode/clock warm-up. It records 100 server-collected paused alignment reports and 300 actual browser `currentTime` drift readings. Each browser compares its playhead with the authoritative timeline at its own calibrated server-time estimate; unsynchronized wall-clock subtraction is not used. Contexts allow autoplay and disable background throttling on one Windows machine (Node 24.15.0, 12 logical CPUs). This is localhost, not a physical ten-device LAN or speaker/frame-presentation test.
+
+| Current localhost measurement | Samples | p50 | p95 | Maximum |
+|---|---:|---:|---:|---:|
+| Pause / readiness rounds / commit (UI click → host confirmation, excluding scheduled hold) | 10 | 327.87ms | 362.06ms | 362.06ms |
+| Reported paused API-position alignment | 100 | 0ms | 0ms | 0ms |
+| Estimated actual resumed video/audio playhead drift | 300 | 54.95ms | 70.94ms | 278.84ms |
+
+Raw current trials: `https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/host-sync-local-browser.json`. The first run is retained as `host-sync-local-before-catchup.json`: estimated drift p95 152.67ms, maximum 374.59ms. A one-time native catch-up after start reduces decode/start delay; unsupported provider SDKs retain their bounded seek strategy. A 0ms paused API reading is not independent evidence of exactly synchronized clocks, decoded/presented frames or audio output. The 80ms admission tolerance is an API-level readiness check, while output depends on browser/device/network behavior.
+
+The full paused handshake is intentionally distinct from normal control-event delivery and can take seconds if a participant is loading, seeking or blocked. It is not described as a ≤250ms transport result. A missing device holds the room paused; timeout, cancellation, stale/source/host/audience changes cannot produce a false successful resume. Public Internet measurements and normal event delivery benchmarks are recorded separately.
+
+## Current public host-sync results (13 October 2026)
+
+Runtime `076cc98` is deployed to https://foyer-cyan.vercel.app (`dpl_H6JNCzP5wy4BLdgiQAiob9FyrGE4`). The same Windows measurement machine reached the public Mumbai-region backend over the Internet, using isolated Chromium contexts and the actual bundled audio/video. No physical LAN, separate devices, artificial network throttling, frame presentation or audio output was measured.
+
+| Public Internet measurement | Samples | p50 | p95 | Maximum |
+|---|---:|---:|---:|---:|
+| Ten socket clients: host emission → recipient state (synthetic readiness) | 810 | 41.76ms | 103.60ms | 226.17ms |
+| Ten isolated video browsers: actual host dispatch → recipient state | 270 | 51.55ms | 144.76ms | 332.21ms |
+| Ten isolated video browsers: matching player-state application | 270 | 151.85ms | 315.14ms | 351.46ms |
+| Ten isolated video browsers: normal control corrected drift | 300 | 20.03ms | 63.47ms | 148.98ms |
+| Ten actual players: host pause / readiness / commit, excluding scheduled hold | 10 | 253.24ms | 1141.57ms | 1141.57ms |
+| Reported paused API-position alignment | 100 | 0ms | 0ms | 0ms |
+| Estimated resumed video/audio playhead drift | 300 | 52.69ms | 67.31ms | 88.39ms |
+
+Raw reports: `https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/themes-vercel-socket.json`, `https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/themes-vercel-player.json` and `https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/host-sync-vercel-browser.json`. Five video and five audio synchronization trials all observed the pause barrier and automatic resume, with no page errors. Normal delivery meets its p95 target; sampled drift meets its ≤500ms target under these conditions. The normal player run used 30 Play/Pause/Seek commands after six warm-ups, with no missing delivery/application samples or recorded failures; minimum-RTT calibration uncertainty was approximately 1.48ms. Application includes the scheduled start hold and has its own higher p95; the full readiness wait is also a separate operation and intentionally exceeds 250ms. A paused API report of 0ms does not establish zero clock or output error.
+
+The public-target suite passes all 11 browser checks: ten use the public app/backend (including held-device readiness, cancellation, host-only authority, timeout/offline feedback, theme persistence, rapid song changes, mobile audio/chat, social features and late joining); the injected metadata/player music-search check intentionally runs an isolated local app. Official YouTube API fixtures are also distinguished from actual provider playback. Phone layout evidence is `https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/themes-mobile-vercel.json` (17 overflow checks); this is touch emulation rather than physical phone/Safari verification.
+
+Actual anonymous YouTube Music search returned 20 Finding Her results; selection played the visible official embed without a second tab or copied link. `https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/music-search-vercel-repeat-2.json` records three successful successive host handshakes and decoded 480×480 playback with no page errors. The first probe timed out waiting for sync-success feedback (`music-search-vercel-first.json`); another repeat timed out waiting for the provider video element (`music-search-vercel-repeat.json`). These failures are retained, their original root cause was not captured, and provider checks now retain UI/state diagnostics on failure. Successful retries do not certify continuous provider availability, every song's embedding permission, or zero playback error. Native ten-player results are separate from this one-player provider smoke test.
+
+## Phone buffering recovery and compact audio (13 October 2026)
+
+The old public runtime falsely displayed an autoplay permission action when a controlled official-API-shaped player took ten seconds to start: its eight-second promise timeout set the blocked state (`https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/phone-buffer-before.txt/png`). Startup now allows 30 seconds and preserves actual buffering; a late playing event recovers. Provider automatic seeks wait one second after buffering and four seconds between corrections, while explicit host seeks remain immediate. This prevents correction from continually discarding a useful buffer. Native SDK seeks observed within a transition guard are deferred/reconciled rather than silently overwritten.
+
+The actual local Listen default is now fast-start 48kbps AAC, 367,000 bytes versus 2,646,044-byte WAV (86% smaller). SHA-256: `e11c150b8d2358ccadb79a6affd432904ad48b55e7528ebdb8171585f502fa9c`. The original WAV stays available; the same procedural melody is regenerated by `npm run media:audio`.
+
+`tests/browser/phone-network.spec.ts` loads the app first, then throttles each of two isolated touch-emulated Chromium contexts to **100kbps HTTP download / 50kbps upload / 200ms HTTP latency** before room creation/join. Both stream actual AAC media, warm to one second of playback, then observe ten seconds. The localhost report (`https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/phone-network-local.json`) records ten readings, zero post-start waiting events, no page/media errors, estimated drift p50 31.31ms/max 341.85ms (p95 equals max for ten samples). This small functional sample is not a ten-user propagation benchmark or physical-phone/cellular/Safari certification; it does not establish WebSocket delay or full-app initial download time. Autoplay is permitted by the fixture flag.
+
+Build/types and 59 unit/integration tests pass. All 13 local workflows are verified across the completed 12-pass/one-fail run and the four-check final YouTube regression rerun. The failed native-seek check identified a guard interaction and was corrected before publication; both logs are retained. Earlier Windows virtual-memory exhaustion interrupted an attempt; LOW_MEMORY allocation flags and a restarted detached local service allowed final browser checks while preserving separate test contexts. Old ten-player measurements above are not relabeled as results for the new AAC source or physical phones. Public verification and current benchmark reports follow below.
+
+## Empty Watch default and final handshake regressions (2026-10-13)
+Runtime 28a6d96 starts Watch rooms without media; benchmarks explicitly select the optional local clip. Local build/type checks pass, 60 unit/integration tests pass, and all 16 browser checks pass (`https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/empty-watch-local-suite.txt`). The suite includes actual two-client native playback, mobile layout and slow-HTTP AAC playback, plus controlled YouTube SDK fixtures for delayed startup, repeated paused seeks, host pause in transit and song switching. Fixtures do not establish third-party media availability.
+
+Fresh localhost socket-only benchmark: 10 participants, 90 measured commands after 9 warm-up commands, 810 recipient samples. p50 5.07ms, p95 16.60ms, max 18.53ms. Windows 11, Node24.15, Ryzen5500U; one monotonic clock from host emit to recipient state callback. This includes play preflight with synthetic player readiness and is not a video synchronization benchmark (`https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/socket-benchmark.json`).
+
+A fresh ten-isolated-context browser benchmark crashed while creating pages, before collecting any trials, both normally and with lower renderer memory. Failed attempts are retained in `https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/room-sync-browser.json` and `https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/empty-watch-sync-browser.json`. No timing claim is made for these attempts; older successful browser results above remain tied to their stated runtime. The final real YouTube Music probe returned 20 search results but its iframe did not become ready; no manual-sync success is claimed for that live provider attempt (`https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/phone-music-final-local.json`). Physical phone/Safari/cellular packet-loss behavior remains unverified.
+
+Final public-target regression suite: 8/8 pass (`https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/empty-watch-vercel-suite.txt`); seven use the public application/backend and the injected search/player case deliberately creates a local isolated application. Two isolated phone Chromium contexts on HTTP 100kbps download / 50kbps upload / 200ms latency recorded zero post-start waiting events over ten seconds and maximum clock-estimated playhead drift 71.14ms (10 readings). This is a functional slow-media check, not a physical phone or LAN timing benchmark (`https://github.com/krishnaagarwal2025-a11y/Foyer/blob/3dd9fec/evidence/empty-watch-phone-network-vercel.json`).

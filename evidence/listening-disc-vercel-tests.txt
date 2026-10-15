@@ -1,6 +1,0 @@
-
-Running 1 test using 1 worker
-
-  ok 1 tests\browser\listening-disc.spec.ts:2:1 › listening vinyl and its center artwork rotate only during actual playback (5.0s)
-
-  1 passed (7.0s)

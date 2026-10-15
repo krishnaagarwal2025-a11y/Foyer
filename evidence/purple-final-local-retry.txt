@@ -1,7 +1,0 @@
-
-Running 2 tests using 1 worker
-
-  ok 1 tests\browser\visual-polish.spec.ts:2:1 › purple theme hierarchy and illustrated light mode fit desktop and phone (3.6s)
-  ok 2 tests\browser\visual-polish.spec.ts:46:1 › real room request displays a rolling disc, errors clear it, and room navigation transitions (4.4s)
-
-  2 passed (9.9s)

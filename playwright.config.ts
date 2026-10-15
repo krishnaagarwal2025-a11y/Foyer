@@ -1,4 +1,6 @@
+import { mkdirSync } from "node:fs";
 import { defineConfig } from "@playwright/test";
+mkdirSync("evidence", { recursive: true });
 export default defineConfig({
   testDir: "./tests/browser",
   timeout: 60000,

@@ -1,7 +1,0 @@
-
-Running 2 tests using 1 worker
-
-  ok 1 tests\browser\listening-disc.spec.ts:2:1 › listening vinyl and its center artwork rotate only during actual playback (3.2s)
-  ok 2 tests\browser\phone-network.spec.ts:4:1 › two phone contexts stream compact audio on a slow HTTP connection without repeated stalls (37.0s)
-
-  2 passed (42.6s)

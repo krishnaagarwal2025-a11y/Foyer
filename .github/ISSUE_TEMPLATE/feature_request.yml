@@ -1,0 +1,17 @@
+name: Feature request
+description: Suggest an improvement to Foyer.
+title: "[Feature] "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Suggested behavior
+      description: Describe the user workflow and any alternatives you considered.
+    validations:
+      required: true

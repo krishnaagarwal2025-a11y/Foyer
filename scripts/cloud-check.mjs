@@ -1,6 +1,7 @@
 import { io } from "socket.io-client";
 import { strict as assert } from "node:assert";
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
+mkdirSync("evidence", { recursive: true });
 const urls = (
   process.env.CHECK_URLS || "http://localhost:3002,http://localhost:3003"
 ).split(",");

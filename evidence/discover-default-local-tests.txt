@@ -1,5 +1,0 @@
-
-Running 5 tests using 1 worker
-
-  ok 1 tests\browser\protocol.spec.ts:17:1 › device packets precede common video/audio start, manual sync checks peers, and queued starts use the protocol (11.9s)
-  ok 2 tests\browser\sidebar-default.spec.ts:2:1 › Discover opens first and queue remove stays a functional square on phones (2.6s)

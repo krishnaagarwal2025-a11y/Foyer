@@ -1,8 +1,0 @@
-
-Running 3 tests using 1 worker
-
-  ok 1 tests\browser\workflows.spec.ts:21:1 › two browsers complete the social and synchronized playback workflow (15.2s)
-  ok 2 tests\browser\workflows.spec.ts:183:1 › invalid invitations, mobile layout and deterministic host replacement (19.7s)
-  ok 3 tests\browser\workflows.spec.ts:216:1 › late join snapshots playback, corrects drift and recovers from a bad source (6.7s)
-
-  3 passed (43.8s)

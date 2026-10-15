@@ -1,5 +1,6 @@
 import { chromium, expect } from "@playwright/test";
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
+mkdirSync("evidence", { recursive: true });
 
 // Real provider playback, separate from the SDK timing fixture. Reuse the public
 // API demo with fresh revisions to exercise cached SDK mounts; this makes no

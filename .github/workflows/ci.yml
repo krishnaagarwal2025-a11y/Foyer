@@ -25,3 +25,14 @@ jobs:
       - run: npm run test:browser
       - run: npm run test:extension
       - run: npm run test:extension:browser
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            playwright-report/
+            test-results/
+            evidence/
+          if-no-files-found: ignore
+          retention-days: 7

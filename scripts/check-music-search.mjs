@@ -1,5 +1,6 @@
 import { chromium, expect } from "@playwright/test";
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
+mkdirSync("evidence", { recursive: true });
 const report = {
   url: process.env.DEMO_URL || "http://localhost:3001",
   query: process.env.MUSIC_QUERY || "finding her",
