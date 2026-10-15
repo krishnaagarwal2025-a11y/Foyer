@@ -91,4 +91,4 @@ React, TypeScript, and Vite power the interface. Express and Socket.IO own versi
 
 See [Contributing](.github/CONTRIBUTING.md) and [Security](.github/SECURITY.md). The bundled font retains its [SIL Open Font License](public/fonts/JetBrainsMono-OFL.txt).
 
-Tool configuration lives in `config/`; use the npm commands above so the correct paths are selected. The root `tsconfig.json` is a minimal discovery entry for editors and deployment tools, and `vercel.json` remains at the root for Vercel.
+Vite and test configuration live in `config/`; use the npm commands above so the correct paths are selected. TypeScript settings stay in the root `tsconfig.json` because Vercel's function compiler reads them directly. The npm manifest, lockfile, and `vercel.json` also remain at the root for their tools.
