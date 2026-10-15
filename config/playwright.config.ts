@@ -1,8 +1,12 @@
 import { mkdirSync } from "node:fs";
 import { defineConfig } from "@playwright/test";
-mkdirSync("evidence", { recursive: true });
+import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+const projectRoot = fileURLToPath(new URL("../", import.meta.url));
+mkdirSync(join(projectRoot, "evidence"), { recursive: true });
 export default defineConfig({
-  testDir: "./tests/browser",
+  testDir: join(projectRoot, "tests/browser"),
+  outputDir: join(projectRoot, "test-results"),
   timeout: 60000,
   workers: 1,
   use: {
@@ -26,11 +30,18 @@ export default defineConfig({
     ? {
         webServer: {
           command: "npm run dev",
+          cwd: projectRoot,
           url: "http://127.0.0.1:5173/api/health",
           reuseExistingServer: !process.env.CI,
           timeout: 60_000,
         },
       }
     : {}),
-  reporter: [["list"], ["html", { open: "never" }]],
+  reporter: [
+    ["list"],
+    [
+      "html",
+      { open: "never", outputFolder: join(projectRoot, "playwright-report") },
+    ],
+  ],
 });

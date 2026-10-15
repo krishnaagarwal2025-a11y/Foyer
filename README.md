@@ -42,7 +42,7 @@ npm start
 
 Open **http://localhost:3001**. Other devices on the same network can use `http://YOUR_LAN_IP:3001` if the firewall permits it.
 
-Default local setup needs no environment configuration. Optional server settings are in [.env.example](.env.example); environment files are not automatically loaded. Keep credentials server-side.
+Default local setup needs no environment configuration. Optional server settings are in [config/.env.example](config/.env.example); environment files are not automatically loaded. Keep credentials server-side.
 
 ## Media support
 
@@ -78,6 +78,7 @@ React, TypeScript, and Vite power the interface. Express and Socket.IO own versi
 | Directory            | Purpose                                             |
 | -------------------- | --------------------------------------------------- |
 | `src/`               | Interface and media adapters                        |
+| `client/`, `config/` | HTML entry point and tool configuration             |
 | `server/`, `shared/` | Room engine, persistence, protocol, synchronization |
 | `extension/`, `api/` | Companion and Vercel entry point                    |
 | `public/`            | Demo media, help pages, bundled font                |
@@ -88,4 +89,6 @@ React, TypeScript, and Vite power the interface. Express and Socket.IO own versi
 
 [Demo](docs/demo.md) · [Usage and troubleshooting](docs/usage.md) · [Synchronization](docs/architecture.md) · [Performance](docs/performance.md) · [Deployment](docs/deployment.md) · [Requirements](docs/requirements.md) · [Presentation notes](docs/presentation.md)
 
-See [Contributing](CONTRIBUTING.md) and [Security](SECURITY.md). The bundled font retains its [SIL Open Font License](public/fonts/JetBrainsMono-OFL.txt).
+See [Contributing](.github/CONTRIBUTING.md) and [Security](.github/SECURITY.md). The bundled font retains its [SIL Open Font License](public/fonts/JetBrainsMono-OFL.txt).
+
+Tool configuration lives in `config/`; use the npm commands above so the correct paths are selected. The root `tsconfig.json` is a minimal discovery entry for editors and deployment tools, and `vercel.json` remains at the root for Vercel.

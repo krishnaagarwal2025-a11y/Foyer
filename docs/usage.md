@@ -51,7 +51,7 @@ Create a **Listen** room or have the host switch an existing room to Listen. Ope
 
 These integrations do not provide blanket access to every commercial recording. YouTube controls its source availability, [Audius](https://docs.audius.co/developers/introduction/overview/) contains artist-published music, and [Navidrome](https://github.com/navidrome/navidrome) serves a **private, self-hosted collection you supply**. Navidrome credentials remain on the server. A separate library code protects searches; signed tickets authorize streaming from that library.
 
-Optional environment variables (copy `.env.example` to review the names; the app does not auto-load `.env`):
+Optional environment variables (see `config/.env.example` for available settings; the app does not auto-load `.env`):
 
 ```text
 NAVIDROME_URL=http://127.0.0.1:4533

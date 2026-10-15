@@ -12,7 +12,7 @@ npm run test:browser
 npm run test:extension
 ```
 
-For provider or synchronization changes, also run relevant player tests and benchmarks from the [README](README.md). Distinguish controlled SDK fixtures from real-provider playback and socket timing from browser drift.
+For provider or synchronization changes, also run relevant player tests and benchmarks from the [README](../README.md). Distinguish controlled SDK fixtures from real-provider playback and socket timing from browser drift.
 
 ## Pull requests
 
