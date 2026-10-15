@@ -51,14 +51,6 @@ test("two phone contexts stream compact audio on a slow HTTP connection without 
       await cdp.send("Network.enable");
       const code = i ? new URL(pages[0].url()).searchParams.get("room") : null;
       await page.goto(code ? `/?room=${code}` : "/");
-      // Load the application first; this probe isolates media buffering rather
-      // than spending most of its test deadline downloading JS/font assets.
-      await cdp.send("Network.emulateNetworkConditions", {
-        offline: false,
-        latency: 200,
-        downloadThroughput: 12500,
-        uploadThroughput: 6250,
-      });
       await page.getByLabel("Display name").fill(`Slow HTTP phone ${i + 1}`);
       if (!i)
         await page
@@ -67,18 +59,52 @@ test("two phone contexts stream compact audio on a slow HTTP connection without 
       await page
         .getByRole("button", { name: i ? "Join room →" : "＋ Create a room" })
         .click();
+      // Warm the lazy player and discovery modules before measuring media.
+      // Otherwise development JS competes with audio for the 100kbps budget.
+      await expect(
+        page.getByRole("heading", { name: "Find a song" }),
+      ).toBeVisible();
       await expect
-        .poll(
-          () =>
-            page
-              .locator("audio")
-              .evaluate((v: HTMLAudioElement) => v.readyState),
-          { timeout: 20000 },
+        .poll(() =>
+          page.locator("audio").evaluate((v: HTMLAudioElement) => v.readyState),
         )
         .toBeGreaterThanOrEqual(2);
       expect(await page.locator("audio").getAttribute("src")).toBe(
         "/media/evening-keys.m4a",
       );
+      await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
+      await cdp.send("Network.emulateNetworkConditions", {
+        offline: false,
+        latency: 200,
+        downloadThroughput: 12500,
+        uploadThroughput: 6250,
+      });
+      const freshResponse = page.waitForResponse(
+        (response) =>
+          response.url().includes("network-probe=") &&
+          response.request().resourceType() === "media",
+      );
+      await page.locator("audio").evaluate((audio: HTMLAudioElement) => {
+        const source = new URL(audio.src);
+        source.searchParams.set("network-probe", crypto.randomUUID());
+        audio.src = source.href;
+        audio.load();
+      });
+      await Promise.all([
+        freshResponse.then((response) => {
+          expect([200, 206]).toContain(response.status());
+          expect(response.fromServiceWorker()).toBe(false);
+        }),
+        expect
+          .poll(
+            () =>
+              page
+                .locator("audio")
+                .evaluate((v: HTMLAudioElement) => v.readyState),
+            { timeout: 20000 },
+          )
+          .toBeGreaterThanOrEqual(2),
+      ]);
     }
     await pages[0].getByRole("button", { name: "Play", exact: true }).click();
     for (const page of pages)
@@ -144,7 +170,7 @@ test("two phone contexts stream compact audio on a slow HTTP connection without 
           readings,
           pageErrors: errors,
           conditions:
-          "Two isolated touch-emulated Chromium contexts, autoplay allowed, actual AAC local audio. After loading the application, each page's HTTP requests are CDP-throttled to 100kbps download, 50kbps upload, 200ms latency before joining. This isolates media streaming rather than full application startup; not proof of WebSocket latency, physical mobile/Safari or real cellular packet-loss behavior. Waiting events counted after playback reached one second; drift uses the app's four-timestamp server-clock estimate.",
+            "Two isolated touch-emulated Chromium contexts, autoplay allowed, actual AAC local audio. After joining and warming the lazy player/discovery interface, HTTP requests are CDP-throttled to 100kbps download, 50kbps upload and 200ms latency. Cache is disabled and audio is reloaded with a unique query; an actual media HTTP response is required before measuring readiness. This isolates fresh media streaming rather than application startup; not proof of WebSocket latency, physical mobile/Safari or real cellular packet loss. Waiting events counted after playback reached one second; drift uses the app's four-timestamp server-clock estimate.",
         },
         null,
         2,

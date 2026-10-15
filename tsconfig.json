@@ -12,5 +12,14 @@
     "noEmit": true,
     "types": ["node", "chrome"]
   },
-  "include": ["api", "src", "server", "shared", "scripts", "tests", "extension", "config"]
+  "include": [
+    "api",
+    "src",
+    "server",
+    "shared",
+    "scripts",
+    "tests",
+    "extension",
+    "config"
+  ]
 }
