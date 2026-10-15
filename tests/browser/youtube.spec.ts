@@ -467,6 +467,7 @@ test("YouTube buffering settles, native host actions synchronize, retry rebuilds
       .getByLabel("YouTube Music song URL")
       .fill("https://music.youtube.com/watch?v=abcdefghijk");
     await host.getByRole("button", { name: "Queue song", exact: true }).click();
+    await guest.getByRole("button", { name: "Room", exact: true }).click();
     await expect(
       guest.getByRole("button", { name: "Queue 1", exact: true }),
     ).toBeVisible();
